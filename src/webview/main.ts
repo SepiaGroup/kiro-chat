@@ -7,6 +7,8 @@ import type { ApprovalRequest, Question } from "../types";
 import { removeAllApprovalCards, removeApprovalCard, renderApproval } from "./approvalCard";
 import { removeQuestionCard, renderQuestion } from "./questionCard";
 import { showSteer } from "./steerNotes";
+import { addCommandOutput, askConfirm, startCommandCard } from "./commandCard";
+import type { Segment } from "../ansiSegments";
 import { clearAttachments, currentAttachments, initDropAndPaste, insertPaths, pushAttachment } from "./attachments";
 import { CommandLike, handlePickerKeydown, hideHint, hidePicker, setCommands, updateHint, updatePicker } from "./commandPicker";
 import {
@@ -190,6 +192,20 @@ window.addEventListener("message", (e: MessageEvent) => {
       break;
     case "notice":
       addSystem(String(msg.text ?? ""), msg.isError ? "error" : "");
+      break;
+    case "commandStart":
+      startCommandCard(Number(msg.run), String(msg.text ?? ""));
+      break;
+    case "commandOutput":
+      addCommandOutput(Number(msg.run), msg.segments as Segment[]);
+      break;
+    case "confirm":
+      askConfirm(Number(msg.id), String(msg.question ?? ""));
+      break;
+    case "setInput":
+      inputEl.value = String(msg.text ?? "");
+      autoGrow();
+      inputEl.focus();
       break;
     case "userMessage":
       addUserMessage(

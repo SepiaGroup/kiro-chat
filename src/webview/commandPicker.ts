@@ -1,6 +1,7 @@
 // The "/" command picker above the input, and the argument hint shown after
 // choosing a command. Browser context.
 
+import { tabCommandList } from "../webCommands";
 import { autoGrow, byId, div, inputEl } from "./ui";
 
 export interface CommandLike {
@@ -13,15 +14,10 @@ export interface CommandLike {
 const pickerEl = byId("cmd-picker");
 const hintEl = byId("cmd-hint");
 
-// Built-in commands always offered (engine may add agents/skills on top).
-const BUILTIN_COMMANDS: CommandLike[] = [
-  { name: "model", description: "Switch the model", inputHint: "model name", type: "builtin" },
-  { name: "agent", description: "Switch the active agent", inputHint: "agent name", type: "builtin" },
-  { name: "compact", description: "Compact the conversation to save context", type: "builtin" },
-  { name: "clear", description: "Clear the conversation", type: "builtin" },
-  { name: "help", description: "Show available commands", type: "builtin" },
-  { name: "title", description: "Show, set or clear this chat's name", inputHint: "name, or clear", type: "builtin" },
-];
+// The tab's own commands (the terminal chat's, see webCommands.ts); the engine
+// adds agents and skills. A remote device's lines all go to the agent as text,
+// so the remote page offers only the engine's.
+const BUILTIN_COMMANDS: CommandLike[] = document.body.classList.contains("remote-page") ? [] : tabCommandList();
 
 let allCommands: CommandLike[] = [...BUILTIN_COMMANDS];
 let pickerMatches: CommandLike[] = [];
@@ -57,9 +53,7 @@ export function updatePicker(): void {
     return;
   }
   const ql = q.toLowerCase();
-  // A remote device's /title goes to the agent as text, so it isn't offered there.
-  const remote = document.body.classList.contains("remote-page");
-  pickerMatches = allCommands.filter((c) => c.name.toLowerCase().includes(ql) && !(remote && c.name === "title" && c.type === "builtin"));
+  pickerMatches = allCommands.filter((c) => c.name.toLowerCase().includes(ql));
   if (pickerMatches.length === 0) {
     hidePicker();
     return;

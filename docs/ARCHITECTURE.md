@@ -31,6 +31,9 @@ extension.ts ── activates, registers commands, status bar, terminal profile
 │         - its own engine process (AcpClient), approvals
 │         - handles messages from webview/main.ts (onMessage)
 │         ├─ chatTranscript.ts  what the chat showed, replayed into a new webview
+│         ├─ webCommands.ts     which slash commands a tab runs, and routing (pure)
+│         ├─ conversationLog.ts what those commands read about the chat (pure)
+│         ├─ ansiSegments.ts    command output colors as style names (pure)
 │         ├─ webviewHtml.ts     the page and its CSP
 │         └─ webviewInput.ts    validation of what the webview posts
 │
@@ -141,6 +144,17 @@ module.
    messages. Remote devices get the same transcript as their snapshot.
 7. Closing a tab disposes its session and kills its engine. The conversation
    stays on disk and appears under Resume.
+
+Slash commands typed in a tab run the terminal chat's code
+(`LocalCommands` / `TerminalCommands`) with a `ChatHost` made by
+`ChatSession.commandHost()`. `webCommands.ts` (pure) routes a line the way the
+terminal chat does and lists the commands a tab runs (the picker uses the same
+list). `conversationLog.ts` (pure) keeps what the commands read (settings,
+engine commands, tool groups, MCP servers, transcript, turn stats).
+`print()` goes to the tab only, as `commandOutput` with the ANSI colors turned
+into style names (`ansiSegments.ts`, pure), and is not recorded; a command's
+y/n question is a `confirm` / `confirmAnswer` pair. Lines from a remote device
+are never run as commands.
 
 The webview's messages are handled in `ChatSession.onMessage` (the
 `switch` on `msg.type`) and `webview/main.ts` (the `message` listener); those

@@ -73,12 +73,16 @@ Then run **Developer: Reload Window**.
 - [ ] Ask for a command with long output (`find . -name '*.ts'`). The chat stays at the bottom as the card fills in, and the output box shows the end of the output. Scrolled up in the chat (or in the box) while it runs, it stays where you are. Same on the phone.
 - [ ] The input starts one row high and grows with content up to 200px.
 - [ ] Enter sends, Shift+Enter adds a line; with `enterToSend` off they swap.
-- [ ] `/` opens the command picker with engine commands, agents and skills.
+- [ ] `/` opens the command picker with the tab's commands (as in the terminal chat, without `/paste`, `/quit`, …) plus the engine's agents and skills.
+- [ ] `/usage`, `/context`, `/tools`, `/model`, `/mcp` and `/config` show their output in a card under the command, with colors; nothing goes to the agent. `/help` lists the commands and the agent's commands.
+- [ ] `/model <name>` switches the model (the toolbar dropdown follows). `/compact` after a few messages compacts (status shows "Compacting…"). `/clear` empties the chat. `/resume` opens the Resume panel.
+- [ ] `/knowledge clear` shows a Yes/No card; No does nothing. `/paste` and `/quit` say they're for the terminal chat. `/nope` says unknown command. ` /usage` (leading space) goes to the agent as text.
+- [ ] On the phone, `/` offers only the engine's commands, and `/usage` goes to the agent as text.
 - [ ] Paste a screenshot (`Cmd+V`) → it attaches. Shift-drag an image file → it attaches.
 - [ ] Dragging a non-image file from the Explorer inserts its path.
 
 ### Renaming a chat
-- [ ] In a chat tab, type `/` and pick **title**. `/title Build` renames the tab to "Build" and says "Title set to Build (tab and session)."; nothing goes to the agent. `/title` shows the name.
+- [ ] In a chat tab, type `/` and pick **title**. `/title Build` renames the tab to "Build" and says "Title set to Build."; nothing goes to the agent. `/title` shows the name.
 - [ ] Reload the window: the tab is still "Build". `/title clear` gives it its own name back ("Kiro Chat 2"), also after the reload. A new tab gets the next number.
 - [ ] **Kiro CLI Chat: Rename Chat…** with the tab active: the box shows the name selected. A new name renames it; Esc keeps it; an empty name resets it.
 - [ ] On the phone, typing `/` doesn't offer `/title`. A chat renamed before its engine started (right after a reload) shows the new name in Resume.
