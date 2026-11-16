@@ -146,6 +146,14 @@ window.addEventListener("message", (e: MessageEvent) => {
     case "remoteState":
       setRemoteState(msg.running === true);
       break;
+    case "titleState":
+      // Saved with the tab/view, so a reload keeps the name (and the one a reset goes back to).
+      vscode.setState({
+        ...savedState(),
+        title: typeof msg.title === "string" ? msg.title : undefined,
+        defaultTitle: typeof msg.defaultTitle === "string" ? msg.defaultTitle : undefined,
+      });
+      break;
     case "status":
       setStatus(String(msg.text ?? ""));
       // While starting up, mirror progress into the indicator label.
@@ -230,12 +238,17 @@ window.addEventListener("message", (e: MessageEvent) => {
   }
 });
 
+function savedState(): Record<string, unknown> {
+  const s = vscode.getState();
+  return s && typeof s === "object" ? (s as Record<string, unknown>) : {};
+}
+
 function handleEvent(ev: ChatEventLike): void {
   switch (ev.kind) {
     case "sessionId":
       // Saved by VS Code with the tab/view, so a window reload reopens it.
       if (typeof ev.sessionId === "string") {
-        vscode.setState({ sessionId: ev.sessionId });
+        vscode.setState({ ...savedState(), sessionId: ev.sessionId });
       }
       break;
     case "runStarted":

@@ -39,7 +39,13 @@ class FakeWebview {
   }
 }
 
+class TabInputWebview {
+  constructor(readonly viewType: string) {}
+}
+const tabGroups: { all: Array<{ viewColumn: number; tabs: Array<{ label: string; input: unknown }> }> } = { all: [] };
+
 class FakePanel {
+  viewColumn = 1;
   readonly webview = new FakeWebview();
   active = true;
   iconPath: unknown;
@@ -55,6 +61,7 @@ class FakePanel {
 }
 
 const created: FakePanel[] = [];
+let inputBoxAnswer: string | undefined;
 const fakeVscode = {
   EventEmitter: Emitter,
   Uri: {
@@ -62,6 +69,7 @@ const fakeVscode = {
     file: (p: string) => ({ fsPath: p }),
   },
   ViewColumn: { Active: -1, Beside: -2 },
+  TabInputWebview,
   window: {
     createWebviewPanel: (_type: string, title: string) => {
       const p = new FakePanel(title);
@@ -69,6 +77,9 @@ const fakeVscode = {
       return p;
     },
     showWarningMessage: () => Promise.resolve(undefined),
+    showInformationMessage: () => Promise.resolve(undefined),
+    showInputBox: () => Promise.resolve(inputBoxAnswer),
+    tabGroups,
   },
   workspace: { workspaceFolders: undefined, getConfiguration: () => ({ get: (_k: string, d: unknown) => d }) },
 };
@@ -215,4 +226,153 @@ test("the list of chats follows the tabs, and listeners hear about changes", () 
   created[0].disposed.fire();
   assert.equal(p.chats().length, 1);
   assert.equal(changes, 3);
+});
+
+test("/title renames the tab, its saved state and the remote list; clear gives its name back", async () => {
+  const p = makeProvider();
+  let changes = 0;
+  p.onDidChangeChats(() => changes++);
+  p.newTab();
+  p.newTab();
+  const tab = created[1];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(tab);
+  chat.ensureStarted = () => Promise.resolve();
+  tab.webview.messages.fire({ type: "ready" });
+  await tick();
+  changes = 0;
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title  Build\tfix ", images: [] });
+  await tick();
+  assert.equal(tab.title, "Build fix");
+  assert.equal(chat.title, "Build fix");
+  assert.equal(changes, 1);
+  assert.deepEqual(tab.webview.sent.filter((m) => m.type === "titleState").at(-1), { type: "titleState", title: "Build fix", defaultTitle: "Kiro Chat 2" });
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.text === "Title set to Build fix."));
+  assert.ok(!tab.webview.sent.some((m) => m.type === "userMessage"), "not sent to the agent");
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title", images: [] });
+  await tick();
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && String(m.text).startsWith("Title: Build fix")));
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title clear", images: [] });
+  await tick();
+  assert.equal(tab.title, "Kiro Chat 2");
+  assert.equal(chat.title, "Kiro Chat 2");
+  assert.equal(created[0].title, "Kiro Chat", "the other tab is untouched");
+});
+
+test("a renamed tab comes back renamed after a reload, and a reset still knows its own name", async () => {
+  const p = makeProvider();
+  const restored = new FakePanel("Build");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p.adoptEditorPanel(restored as any, { sessionId: "s", title: "Build", defaultTitle: "Kiro Chat 3" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(restored);
+  assert.equal(chat.title, "Build");
+  p.newTab();
+  assert.equal(created[0].title, "Kiro Chat 4");
+  chat.rename(undefined);
+  assert.equal(restored.title, "Kiro Chat 3");
+});
+
+test("Rename Chat renames the current chat; an empty name resets it, Esc keeps it", async () => {
+  const p = makeProvider();
+  p.newTab();
+  inputBoxAnswer = "Docs";
+  await p.renameChat();
+  assert.equal(created[0].title, "Docs");
+  inputBoxAnswer = undefined;
+  await p.renameChat();
+  assert.equal(created[0].title, "Docs");
+  inputBoxAnswer = "";
+  await p.renameChat();
+  assert.equal(created[0].title, "Kiro Chat");
+});
+
+test("the panel view's name follows a rename", async () => {
+  const p = makeProvider();
+  const view = { webview: new FakeWebview(), visible: true, title: undefined as string | undefined, onDidDispose: new Emitter<void>().event, onDidChangeVisibility: new Emitter<void>().event };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p.resolveWebviewView(view as any, { state: { title: "Notes" } } as any);
+  assert.equal(view.title, "Notes");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (p as any).panelChat.rename(undefined);
+  assert.equal(view.title, undefined);
+});
+
+test("a chat name is one short line", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { cleanTitle } = require("./chatSession") as typeof import("./chatSession");
+  assert.equal(cleanTitle("  a\n\u0007b  "), "a b");
+  assert.equal(cleanTitle("   "), undefined);
+  assert.equal(cleanTitle(3), undefined);
+  assert.equal(cleanTitle("x".repeat(100))?.length, 80);
+});
+
+test("Rename Chat from a tab's context menu renames the tab clicked, not the current one", async () => {
+  const p = makeProvider();
+  p.newTab();
+  p.newTab();
+  const [t1, t2] = created;
+  t2.viewColumn = 2;
+  const chatTab = (label: string) => ({ label, input: new TabInputWebview("mainThreadWebview-kiroCliChat.editor") });
+  tabGroups.all = [
+    { viewColumn: 1, tabs: [{ label: "notes.md", input: {} }, chatTab("Kiro Chat")] },
+    { viewColumn: 2, tabs: [chatTab("Kiro Chat 2")] },
+  ];
+  inputBoxAnswer = "First";
+  await p.renameChat(1); // the current chat is tab 2; the click was on tab 1
+  assert.equal(t1.title, "First");
+  assert.equal(t2.title, "Kiro Chat 2");
+  inputBoxAnswer = "Second";
+  await p.renameChat(0); // index 0: a file in group 1, the chat in group 2
+  assert.equal(t2.title, "Second");
+  tabGroups.all = [{ viewColumn: 1, tabs: [{ label: "Preview", input: new TabInputWebview("markdown.preview") }] }];
+  await p.renameChat(0);
+  assert.equal(t1.title, "First", "another extension's webview is left alone");
+  tabGroups.all = [];
+});
+
+test("a restored name without its saved own name doesn't become the name a reset goes back to", () => {
+  const p = makeProvider();
+  const restored = new FakePanel("Build");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p.adoptEditorPanel(restored as any, { sessionId: "s", title: "Build" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(restored);
+  assert.equal(chat.title, "Build");
+  chat.rename(undefined);
+  assert.equal(restored.title, "Kiro Chat");
+});
+
+test("the session gets the name once the engine runs, a failure says so, and a slow engine doesn't hold up the notice", async () => {
+  const p = makeProvider();
+  p.newTab();
+  const tab = created[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(tab);
+  chat.ensureStarted = () => Promise.resolve();
+  tab.webview.messages.fire({ type: "ready" });
+  await tick();
+  chat.rename("Early"); // no engine yet: nothing to send
+  const sent: unknown[] = [];
+  let fail = false;
+  const client = {
+    extMethod: (m: string, params: unknown) => {
+      sent.push([m, params]);
+      return fail ? Promise.reject(new Error("boom")) : new Promise(() => undefined); // never answers
+    },
+  };
+  chat.transport = { mode: "persistent", client };
+  chat.engineTitle = undefined;
+  chat.sendTitle(); // what start does once the engine is up
+  assert.deepEqual(sent, [["_kiro/session/rename", { title: "Early" }]]);
+  chat.sendTitle();
+  assert.equal(sent.length, 1, "sent once");
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title Later", images: [] });
+  await tick();
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.text === "Title set to Later."), "not held up by the engine");
+  fail = true;
+  chat.rename("Broken");
+  await tick();
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.isError && String(m.text).includes("could not be changed: boom")));
+  chat.transport = undefined;
 });

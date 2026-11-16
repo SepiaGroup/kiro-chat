@@ -20,6 +20,7 @@ const BUILTIN_COMMANDS: CommandLike[] = [
   { name: "compact", description: "Compact the conversation to save context", type: "builtin" },
   { name: "clear", description: "Clear the conversation", type: "builtin" },
   { name: "help", description: "Show available commands", type: "builtin" },
+  { name: "title", description: "Show, set or clear this chat's name", inputHint: "name, or clear", type: "builtin" },
 ];
 
 let allCommands: CommandLike[] = [...BUILTIN_COMMANDS];
@@ -56,7 +57,9 @@ export function updatePicker(): void {
     return;
   }
   const ql = q.toLowerCase();
-  pickerMatches = allCommands.filter((c) => c.name.toLowerCase().includes(ql));
+  // A remote device's /title goes to the agent as text, so it isn't offered there.
+  const remote = document.body.classList.contains("remote-page");
+  pickerMatches = allCommands.filter((c) => c.name.toLowerCase().includes(ql) && !(remote && c.name === "title" && c.type === "builtin"));
   if (pickerMatches.length === 0) {
     hidePicker();
     return;

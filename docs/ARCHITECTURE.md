@@ -119,6 +119,19 @@ module.
    keeps that state with the tab/view, so after a window reload
    `deserializeWebviewPanel` (tabs) or `resolveWebviewView` (panel) gets it
    back and the session reopens it. If the load fails, it starts a new session.
+   A renamed chat (`/title`, handled in `ChatSession` before the prompt reaches
+   the engine, or **Rename Chat…**) keeps `title` and `defaultTitle` in the
+   same state (posted as `titleState`, desktop only). VS Code restores a tab
+   with the title it had, so `defaultTitle` is the name a reset goes back to
+   and keeps the tab numbering right. `ChatSessionHooks.renamed` sets
+   `WebviewPanel.title` or `WebviewView.title`; `changed` updates the remote
+   list; `_kiro/session/rename` renames the session for Resume. Only the
+   desktop's `/title` renames: a remote device's goes to the agent.
+   The tab's right-click menu has Rename Chat on every webview tab
+   (`resourceScheme == webview-panel`): VS Code 1.98 sets no context key with
+   the clicked tab's view type. The command gets `{ groupId, editorIndex }`;
+   the API has no group ids, so `clickedChat` looks at that index in every
+   group for a Kiro chat tab and matches the panel by title and column.
 6. If the panel view is moved and VS Code rebuilds its webview, the same
    `ChatSession` replays its transcript into the new webview (`resyncWebview`).
    The transcript lives in memory only, at most 20,000 messages and 32 M JSON
