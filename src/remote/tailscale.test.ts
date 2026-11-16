@@ -74,7 +74,7 @@ test("the output of serve, as seen on a tailnet where Serve was off", () => {
 
 test("expose: runs serve for the local port and gives the tailnet address", async () => {
   const f = fake({ "status": () => ok(status("Running")), "serve status": () => ok("{}"), serve: () => ok("Available within your tailnet") });
-  const t = new TailscaleServe(f.run);
+  const t = new TailscaleServe(f.run, undefined, async () => false);
   const r = await t.expose(51234);
   assert.deepEqual(r, { ok: true, url: "https://michaels-mac-pro.taila1bfeb.ts.net:8443" });
   assert.ok(f.calls.includes("/usr/local/bin/tailscale serve --bg --https=8443 http://127.0.0.1:51234"));
@@ -82,10 +82,10 @@ test("expose: runs serve for the local port and gives the tailnet address", asyn
 });
 
 test("expose: says why it cannot, and runs nothing it should not", async () => {
-  assert.match(((await new TailscaleServe(fake({}, []).run).expose(1)) as { advice: string }).advice, /not installed/);
+  assert.match(((await new TailscaleServe(fake({}, []).run, undefined, async () => false).expose(1)) as { advice: string }).advice, /not installed/);
 
   const loggedOut = fake({ status: () => ok(status("NeedsLogin")) });
-  const r1 = await new TailscaleServe(loggedOut.run).expose(1);
+  const r1 = await new TailscaleServe(loggedOut.run, undefined, async () => false).expose(1);
   assert.match((r1 as { advice: string }).advice, /not logged in/);
   assert.ok(!loggedOut.calls.some((c) => c.includes("--bg")));
 
@@ -93,7 +93,7 @@ test("expose: says why it cannot, and runs nothing it should not", async () => {
     status: () => ok(status("Running")),
     "serve status": () => ok(JSON.stringify({ Web: { "michaels-mac-pro.taila1bfeb.ts.net:8443": { Handlers: { "/": { Path: "/tmp" } } } } })),
   });
-  const r2 = await new TailscaleServe(busy.run).expose(1);
+  const r2 = await new TailscaleServe(busy.run, undefined, async () => false).expose(1);
   assert.match((r2 as { advice: string }).advice, /already used/);
   assert.ok(!busy.calls.some((c) => c.includes("--bg")));
 
@@ -102,7 +102,7 @@ test("expose: says why it cannot, and runs nothing it should not", async () => {
     "serve status": () => ok("{}"),
     serve: () => ({ code: null, timedOut: true, stderr: "", stdout: "Serve is not enabled on your tailnet.\nTo enable, visit:\n https://login.tailscale.com/f/serve?node=abc\n" }),
   });
-  const t = new TailscaleServe(notEnabled.run);
+  const t = new TailscaleServe(notEnabled.run, undefined, async () => false);
   const r3 = await t.expose(1);
   assert.equal(r3.ok, false);
   assert.equal((r3 as { enableUrl?: string }).enableUrl, "https://login.tailscale.com/f/serve?node=abc");
@@ -111,7 +111,7 @@ test("expose: says why it cannot, and runs nothing it should not", async () => {
 
 test("remove takes down only what expose set up, once", async () => {
   const f = fake({ status: () => ok(status("Running")), "serve status": () => ok("{}"), serve: () => ok() });
-  const t = new TailscaleServe(f.run);
+  const t = new TailscaleServe(f.run, undefined, async () => false);
   await t.remove(); // nothing exposed: runs nothing
   assert.ok(!f.calls.some((c) => c.includes("off")));
   await t.expose(1, 10000);

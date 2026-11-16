@@ -5,7 +5,10 @@
 /** Most messages kept; older ones are dropped. */
 export const MAX_TRANSCRIPT = 20000;
 /**
- * Most text kept per chat, in characters (about bytes; pasted images are base64).
+ * Most kept per chat, counted in JSON characters (UTF-16 units). V8 keeps
+ * one-byte text (base64 images, most code and English) at a byte per
+ * character and other text at two, so this is 32 to 64 MB of memory. The
+ * remote stream and a snapshot point at the same objects; they add no copy.
  * Over it, images in the oldest messages go first, then the oldest messages.
  */
 export const MAX_TRANSCRIPT_CHARS = 32 * 1024 * 1024;
@@ -33,6 +36,8 @@ type Msg = {
 export class ChatTranscript {
   private messages: Entry[] = [];
   private chars = 0;
+  /** No message before this index still holds images (so trimming does not look there again). */
+  private imagesFrom = 0;
   // Latest state snapshots: only the newest one matters.
   private lastReady?: unknown;
   private lastConfig?: unknown;
@@ -48,36 +53,56 @@ export class ChatTranscript {
   }
 
   private keep(test: (m: Msg) => boolean): void {
-    this.messages = this.messages.filter((e) => test(e.msg as Msg));
-    this.chars = this.messages.reduce((n, e) => n + e.size, 0);
+    this.messages = this.messages.filter((e) => {
+      const kept = test(e.msg as Msg);
+      if (!kept) {
+        this.chars -= e.size;
+      }
+      return kept;
+    });
+    this.imagesFrom = 0; // indexes moved; the next trim looks again once
+  }
+
+  /** Drop the oldest `n` messages. */
+  private dropOldest(n: number): void {
+    for (let i = 0; i < n; i++) {
+      this.chars -= this.messages[i].size;
+    }
+    this.messages.splice(0, n);
+    this.imagesFrom = Math.max(0, this.imagesFrom - n);
   }
 
   /** Over the size budget: drop image data from the oldest messages, then the oldest messages. */
   private trim(): void {
     if (this.messages.length > MAX_TRANSCRIPT) {
-      this.messages.splice(0, this.messages.length - MAX_TRANSCRIPT);
-      this.chars = this.messages.reduce((n, e) => n + e.size, 0);
+      this.dropOldest(this.messages.length - MAX_TRANSCRIPT);
     }
-    for (let i = 0; i < this.messages.length - 1 && this.chars > this.maxChars; i++) {
+    if (this.chars <= this.maxChars) {
+      return;
+    }
+    let i = this.imagesFrom;
+    for (; i < this.messages.length - 1 && this.chars > this.maxChars; i++) {
       const m = this.messages[i].msg as Msg;
       const n = m.type === "userMessage" && Array.isArray(m.images) ? m.images.length : 0;
       if (n === 0) {
         continue;
       }
       const lighter = { ...m, images: [] };
-      const note = { type: "notice", text: `${n === 1 ? "An image" : `${n} images`} from this message ${n === 1 ? "is" : "are"} no longer kept (the chat is long).` };
+      const note = { type: "notice", text: `${n === 1 ? "An image" : `${n} images`} from this message ${n === 1 ? "is" : "are"} no longer kept, to save memory.` };
       const entries = [lighter, note].map((msg) => ({ msg, size: sizeOf(msg) }));
       this.chars += entries[0].size + entries[1].size - this.messages[i].size;
       this.messages.splice(i, 1, ...entries);
       i++; // past the notice
     }
+    this.imagesFrom = i;
     let drop = 0;
-    while (drop < this.messages.length - 1 && this.chars > this.maxChars) {
-      this.chars -= this.messages[drop].size;
+    let chars = this.chars;
+    while (drop < this.messages.length - 1 && chars > this.maxChars) {
+      chars -= this.messages[drop].size;
       drop++;
     }
     if (drop > 0) {
-      this.messages.splice(0, drop);
+      this.dropOldest(drop);
     }
   }
 
@@ -91,6 +116,7 @@ export class ChatTranscript {
       case "cleared":
         this.messages = [];
         this.chars = 0;
+        this.imagesFrom = 0;
         break;
       case "userMessage":
       case "error":

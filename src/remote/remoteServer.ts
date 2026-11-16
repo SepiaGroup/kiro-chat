@@ -138,6 +138,8 @@ export class RemoteServer {
   private readonly listClients = new Set<Client>();
   private readonly internalLists = new Set<Client>();
   private readonly relays = new Set<Relay>();
+  /** Relays being opened (waiting for the other window), counted against the device's limit. */
+  private readonly pendingRelays = new Map<string, number>();
   private readonly pairLimiter: RateLimiter;
 
   constructor(private readonly opts: RemoteServerOptions) {
@@ -336,22 +338,19 @@ export class RemoteServer {
       }
       const m = /^\/api\/chats\/([^/]+)\/(events|message)$/.exec(path);
       if (m) {
-        const id = decodeURIComponent(m[1]);
-        const chat = this.opts.chats().find((c) => c.id === id);
-        const member = chat ? undefined : this.opts.members?.().find((c) => c.id === id);
-        if (!chat && !member) {
+        const found = this.findChat(decodeURIComponent(m[1]));
+        if (!found) {
           return this.fail(res, 404, "no such chat");
         }
         if (method === "GET" && m[2] === "events") {
           if (!granted.includes("view")) {
             return this.fail(res, 403, "this device may not view chats");
           }
-          const header = req.headers["last-event-id"];
-          const last = typeof header === "string" ? header : (url.searchParams.get("last") ?? undefined);
-          return chat ? this.openChatStream(req, res, device, chat, last) : await this.openRelay(req, res, device, member as MemberChat, last);
+          const last = lastEventId(req, url);
+          return found.kind === "here" ? this.openChatStream(req, res, device, found.chat, last) : await this.openRelay(req, res, device, found.chat, last);
         }
         if (method === "POST" && m[2] === "message") {
-          return await this.message(req, res, device, chat ?? (member as MemberChat), granted);
+          return await this.message(req, res, device, found.chat, granted);
         }
       }
       return this.fail(res, method === "GET" || method === "POST" ? 404 : 405, "not found");
@@ -470,6 +469,16 @@ export class RemoteServer {
     }
   }
 
+  /** A chat of this window, or of another one (on the hub). */
+  private findChat(id: string): { kind: "here"; chat: RemoteChat } | { kind: "member"; chat: MemberChat } | undefined {
+    const here = this.opts.chats().find((c) => c.id === id);
+    if (here) {
+      return { kind: "here", chat: here };
+    }
+    const member = this.opts.members?.().find((c) => c.id === id);
+    return member ? { kind: "member", chat: member } : undefined;
+  }
+
   /** A phone's stream of a chat in another window: the other window's own stream, passed through. */
   private async openRelay(
     req: http.IncomingMessage,
@@ -481,12 +490,21 @@ export class RemoteServer {
     if (this.streamsOf(device.id) >= MAX_STREAMS_PER_DEVICE) {
       return this.fail(res, 429, "too many open chats on this device");
     }
+    // Hold the slot while waiting, so several at once cannot all pass the check above.
+    this.pendingRelays.set(device.id, (this.pendingRelays.get(device.id) ?? 0) + 1);
     let up: http.IncomingMessage;
     try {
       up = await chat.stream(lastEventId);
     } catch (err) {
       this.opts.log?.(`stream of ${chat.window} failed: ${err instanceof Error ? err.message : String(err)}`);
       return this.fail(res, 502, "that VS Code window does not answer");
+    } finally {
+      const n = (this.pendingRelays.get(device.id) ?? 1) - 1;
+      if (n > 0) {
+        this.pendingRelays.set(device.id, n);
+      } else {
+        this.pendingRelays.delete(device.id);
+      }
     }
     if (req.destroyed) {
       up.destroy();
@@ -498,6 +516,7 @@ export class RemoteServer {
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     });
+    res.flushHeaders(); // the page knows the stream is open before the other window sends anything
     const relay: Relay = { res, device: device.id, chatId: chat.id, up };
     this.relays.add(relay);
     up.on("data", (chunk: Buffer) => {
@@ -568,7 +587,7 @@ export class RemoteServer {
     }
     this.listClients.forEach((c) => c.device === device && n++);
     this.relays.forEach((r) => r.device === device && n++);
-    return n;
+    return n + (this.pendingRelays.get(device) ?? 0);
   }
 
   private sse(c: Client, event: string | undefined, data: string, id?: string): void {
@@ -613,7 +632,18 @@ export class RemoteServer {
     const token = this.opts.internal?.token;
     const auth = req.headers.authorization;
     // Loopback Host and the secret: what comes through the tailnet address has neither.
-    if (!token || !isLoopbackHost(req.headers.host) || typeof auth !== "string" || !auth.startsWith("Bearer ") || !safeEqual(hashSecret(auth.slice(7)), hashSecret(token))) {
+    // The caller gets a plain 404 either way; the log says which (never the token).
+    const refused = !token
+      ? "this window takes no internal calls"
+      : !isLoopbackHost(req.headers.host)
+        ? "not a loopback Host"
+        : typeof auth !== "string" || !auth.startsWith("Bearer ")
+          ? "no token"
+          : !safeEqual(hashSecret(auth.slice(7)), hashSecret(token))
+            ? "wrong token"
+            : undefined;
+    if (refused) {
+      this.opts.log?.(`internal ${method} ${path} refused: ${refused}`);
       return this.fail(res, 404, "not found");
     }
     res.setHeader("Cache-Control", "no-store");
@@ -635,8 +665,7 @@ export class RemoteServer {
         return this.fail(res, 404, "no such chat");
       }
       if (method === "GET" && m[2] === "events") {
-        const header = req.headers["last-event-id"];
-        return this.openChatStream(req, res, internalDevice, chat, typeof header === "string" ? header : (url.searchParams.get("last") ?? undefined), true);
+        return this.openChatStream(req, res, internalDevice, chat, lastEventId(req, url), true);
       }
       if (method === "POST" && m[2] === "message") {
         const body = (await this.readJson(req, res, MAX_BODY)) as { msg?: unknown; device?: { id?: unknown; name?: unknown }; permissions?: unknown } | undefined;
@@ -681,6 +710,9 @@ export class RemoteServer {
       res.writeHead(204);
       res.end();
       return;
+    }
+    if (!hub && /^\/internal\/(pair-link|devices)/.test(path)) {
+      this.opts.log?.(`internal ${method} ${path} refused: this window is not the hub`);
     }
     return this.fail(res, 404, "not found");
   }
@@ -789,6 +821,12 @@ export class RemoteServer {
     }
     this.json(res, status, { error });
   }
+}
+
+/** Where a reconnecting stream continues: the EventSource header, or `?last=` from a page that reopened it. */
+function lastEventId(req: http.IncomingMessage, url: URL): string | undefined {
+  const header = req.headers["last-event-id"];
+  return typeof header === "string" ? header : (url.searchParams.get("last") ?? undefined);
 }
 
 function parsePermissionList(raw: unknown): Permission[] {

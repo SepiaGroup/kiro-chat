@@ -120,3 +120,55 @@ test("release only gives up a lock this window holds", () => {
     r.done();
   }
 });
+
+test("files from before this Mac restarted are stale, even when the pid is in use again", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kreg-"));
+  try {
+    const before = new WindowRegistry(dir, () => true, 1_000_000);
+    before.publish(win("aaaaaaaa", 11));
+    assert.equal(before.claimHub("aaaaaaaa", 11), true);
+    const after = new WindowRegistry(dir, () => true, 1_000_000 + 3600); // an hour later, a new boot
+    assert.deepEqual(after.windows(), []);
+    assert.equal(after.hub(), undefined);
+    after.publish(win("bbbbbbbb", 12));
+    assert.equal(after.claimHub("bbbbbbbb", 12), true, "the stale lock is replaced");
+    assert.deepEqual(after.hub(), { id: "bbbbbbbb", pid: 12 });
+    const sameBoot = new WindowRegistry(dir, () => true, 1_000_000 + 3600 + 30); // clock moved a little
+    assert.deepEqual(sameBoot.hub(), { id: "bbbbbbbb", pid: 12 });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("temp files left by a window that died while writing are removed once old", () => {
+  const r = rig();
+  try {
+    r.registry.publish(win("aaaaaaaa", 11));
+    const old = path.join(r.dir, "windows", "aaaaaaaa.json.4242.0badc0de.tmp");
+    const fresh = path.join(r.dir, "hub.lock.4242.0badc0df.tmp");
+    fs.writeFileSync(old, "{");
+    fs.writeFileSync(fresh, "{");
+    const past = new Date(Date.now() - 5 * 60_000);
+    fs.utimesSync(old, past, past);
+    assert.deepEqual(r.registry.windows().map((w) => w.id), ["aaaaaaaa"]);
+    assert.ok(!fs.existsSync(old));
+    assert.ok(fs.existsSync(fresh), "one being written now is left alone");
+    assert.deepEqual(fs.readdirSync(path.join(r.dir, "windows")), ["aaaaaaaa.json"], "publish leaves no temp file");
+  } finally {
+    r.done();
+  }
+});
+
+test("a damaged (empty) lock is replaced, and the token file is complete when it appears", () => {
+  const r = rig();
+  try {
+    r.registry.publish(win("aaaaaaaa", 11));
+    fs.mkdirSync(r.dir, { recursive: true });
+    fs.writeFileSync(path.join(r.dir, "hub.lock"), "");
+    assert.equal(r.registry.claimHub("aaaaaaaa", 11), true);
+    assert.equal(r.registry.token().length >= 32, true);
+    assert.deepEqual(fs.readdirSync(r.dir).filter((n) => n.endsWith(".tmp") || n.endsWith(".stale")), []);
+  } finally {
+    r.done();
+  }
+});

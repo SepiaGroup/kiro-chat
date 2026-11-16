@@ -62,7 +62,7 @@ test("over the size budget, images in the oldest messages go first, with a notic
   const out = t.replay() as Array<{ type: string; text?: string; images?: unknown[] }>;
   assert.equal(out[0].text, "first");
   assert.deepEqual(out[0].images, []);
-  assert.deepEqual(out[1], { type: "notice", text: "2 images from this message are no longer kept (the chat is long)." });
+  assert.deepEqual(out[1], { type: "notice", text: "2 images from this message are no longer kept, to save memory." });
   assert.equal(out[2].type, "event");
   assert.equal(out[3].images?.length, 1); // the newest keeps its image
 });
@@ -89,4 +89,21 @@ test("the size count follows removals and clears", () => {
   t.record({ type: "cleared" });
   t.record(ev({ kind: "assistantChunk", text: "z".repeat(1500) }));
   assert.equal(t.replay().length, 1);
+});
+
+test("trimming keeps its count right over many messages and finds images added later", () => {
+  const t = new ChatTranscript(5000);
+  const img = { mimeType: "image/png", data: "B".repeat(800) };
+  for (let i = 0; i < 200; i++) {
+    t.record(ev({ kind: "assistantChunk", text: `${i}`.padEnd(100, ".") }));
+    if (i === 150) {
+      t.record({ type: "userMessage", text: "late", images: [img] });
+    }
+  }
+  const out = t.replay() as Array<{ type: string; text?: string; images?: unknown[]; event?: { text: string } }>;
+  const total = out.reduce((n, m) => n + JSON.stringify(m).length, 0);
+  assert.ok(total <= 5000, `kept ${total}`);
+  assert.equal(out.at(-1)?.event?.text.startsWith("199"), true);
+  const late = out.find((m) => m.text === "late");
+  assert.ok(!late || (late.images ?? []).length === 0, "the image goes before its text");
 });

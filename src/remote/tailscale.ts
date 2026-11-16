@@ -182,8 +182,8 @@ export class TailscaleServe {
   constructor(
     private readonly run: Run = nodeRun,
     private readonly log: (line: string) => void = () => undefined,
-    /** Whether something listens on a local port (the guard below). */
-    private readonly isAlive: (port: number) => Promise<boolean> = async () => false
+    /** Whether a local port still has a server (required: without it, a live share of another window could be taken). */
+    private readonly isAlive: (port: number) => Promise<boolean>
   ) {}
 
   get active(): boolean {

@@ -23,10 +23,29 @@ export interface LocalHost extends ChatHost {
   newConversation(clearScreen: boolean): Promise<void>;
   restart(): Promise<void>;
   login(): void;
-  /** Start or stop remote access, or show its pairing card (VS Code's own commands). */
-  remoteAccess(action: "start" | "link" | "stop"): Promise<void>;
+  /** Start or stop remote access, or show its pairing card (VS Code's own commands). True when it worked. */
+  remoteAccess(action: RemoteAction): Promise<boolean>;
   clearScreen(): void;
   exit(): void;
+}
+
+export type RemoteAction = "start" | "link" | "stop";
+
+/** `/remote` and its argument; `on` and `off` work too. */
+export function parseRemoteAction(arg: string): RemoteAction | undefined {
+  const a = arg.trim().toLowerCase();
+  return a === "" || a === "start" || a === "on" ? "start" : a === "link" ? "link" : a === "stop" || a === "off" ? "stop" : undefined;
+}
+
+/**
+ * What the terminal says after a /remote action. Nothing when it failed: VS
+ * Code already showed why (untrusted workspace, no answer from the hub, …).
+ */
+export function remoteResultText(action: RemoteAction, ok: boolean): string | undefined {
+  if (!ok) {
+    return action === "stop" ? undefined : "No pairing card: see the message in VS Code.";
+  }
+  return action === "stop" ? "Remote access is off." : "The pairing card is open in the editor. Scan the code or copy the link there.";
 }
 
 export class LocalCommands {
@@ -156,11 +175,15 @@ export class LocalCommands {
           this.host.login();
           break;
         case "remote": {
-          const action = arg.trim().toLowerCase() || "start";
-          if (action === "start" || action === "link" || action === "stop") {
-            await this.host.remoteAccess(action);
-          } else {
+          const action = parseRemoteAction(arg);
+          if (!action) {
             this.host.print(style.gray("Usage: /remote [start | link | stop]"));
+            break;
+          }
+          const ok = await this.host.remoteAccess(action);
+          const text = remoteResultText(action, ok);
+          if (text) {
+            this.host.print(style.gray(text));
           }
           break;
         }

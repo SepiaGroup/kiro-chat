@@ -47,9 +47,9 @@ export interface ChatSessionHooks {
 /** What the Settings panel needs from remote access (the desktop page only; remote devices cannot reach it). */
 export interface RemoteAccessControl {
   readonly running: boolean;
-  start(showLink: boolean): Promise<void>;
+  start(showLink: boolean): Promise<unknown>;
   stop(): Promise<void>;
-  showLink(): Promise<void>;
+  showLink(): Promise<unknown>;
 }
 
 /** Where a message from a screen came from. Remote ones are checked before they get here; `device` is its name. */

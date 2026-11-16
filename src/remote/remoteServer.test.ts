@@ -578,3 +578,66 @@ test("a busy port fails cleanly and the same server can start on another", async
     await new Promise<void>((r) => blocker.close(() => r()));
   }
 });
+
+test("streams of another window's chats opened all at once still stop at the device's limit", async () => {
+  const { PassThrough } = await import("stream");
+  const devices = new DeviceStore();
+  const pairing = new PairingCode();
+  const ups: Array<InstanceType<typeof PassThrough>> = [];
+  const member = {
+    id: "aaaaaaaa.m1",
+    title: "Build",
+    busy: false,
+    window: "Other",
+    stream: async () => {
+      await new Promise((r) => setTimeout(r, 100)); // the other window is slow to answer
+      const up = new PassThrough();
+      ups.push(up);
+      return up as unknown as http.IncomingMessage;
+    },
+    send: async () => undefined,
+  };
+  const server = new RemoteServer({ chats: () => [], members: () => [member], devices, pairing, permissions: () => ["view"], assets: () => undefined });
+  const port = await server.start(0);
+  const rig = { port, pairing } as unknown as Rig;
+  const cookie = await pairDevice(rig);
+  const reqs: http.ClientRequest[] = [];
+  try {
+    const statuses = await Promise.all(
+      Array.from({ length: 11 }, () =>
+        new Promise<number>((resolve, reject) => {
+          const req = http.get({ host: "127.0.0.1", port, path: "/api/chats/aaaaaaaa.m1/events", headers: { Host: `127.0.0.1:${port}`, Cookie: cookie } }, (res) => {
+            resolve(res.statusCode ?? 0);
+            res.resume();
+          });
+          req.on("error", reject);
+          reqs.push(req);
+        })
+      )
+    );
+    assert.equal(statuses.filter((s) => s === 200).length, 8);
+    assert.equal(statuses.filter((s) => s === 429).length, 3);
+  } finally {
+    reqs.forEach((r) => r.destroy());
+    ups.forEach((u) => u.destroy());
+    await server.stop();
+  }
+});
+
+test("a refused internal call is logged with the reason, never the token", async () => {
+  const log: string[] = [];
+  const server = new RemoteServer({ chats: () => [], internal: { token: "s".repeat(43) }, devices: new DeviceStore(), pairing: new PairingCode(), permissions: () => [], assets: () => undefined, log: (l) => log.push(l) });
+  const port = await server.start(0);
+  try {
+    assert.equal((await request(port, "GET", "/internal/chats", { headers: { Authorization: "Bearer guess-" + "g".repeat(40) } })).status, 404);
+    assert.equal((await request(port, "GET", "/internal/chats", { headers: { Host: "mac.tail.ts.net" } })).status, 404);
+    assert.equal((await request(port, "GET", "/internal/devices", { headers: { Authorization: "Bearer " + "s".repeat(43) } })).status, 404);
+    assert.deepEqual(log, [
+      "internal GET /internal/chats refused: wrong token",
+      "internal GET /internal/chats refused: not a loopback Host",
+      "internal GET /internal/devices refused: this window is not the hub",
+    ]);
+  } finally {
+    await server.stop();
+  }
+});
