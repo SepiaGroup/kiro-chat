@@ -7,6 +7,8 @@
 import * as http from "http";
 import { AddressInfo } from "net";
 import {
+  hashSecret,
+  safeEqual,
   clearedCookie,
   cleanDeviceName,
   COOKIE_NAME,
@@ -35,6 +37,30 @@ export interface RemoteChat {
   subscribe(listener: (msg: unknown) => void): () => void;
 }
 
+/**
+ * A chat that lives in another VS Code window. The window that owns the
+ * address (the hub) lists it and passes its stream and messages through.
+ */
+export interface MemberChat {
+  /** The id the phone uses (it carries the window's id, so it cannot clash). */
+  readonly id: string;
+  readonly title: string;
+  readonly busy: boolean;
+  /** The window's name, shown next to the chat. */
+  readonly window: string;
+  /** Open the chat's stream in its window. `lastEventId` asks for a catch-up. Rejects when the window does not answer. */
+  stream(lastEventId: string | undefined): Promise<http.IncomingMessage>;
+  send(msg: RemoteMessage, device: { id: string; name: string }, granted: readonly Permission[]): Promise<void>;
+}
+
+/** What only the hub can do, offered to the other windows (they call it instead of doing it themselves). */
+export interface HubApi {
+  /** A new one-use pairing link. `retry` first tries again to share the address on the tailnet. */
+  pairLink(retry: boolean): Promise<{ link: string; shared: boolean; problem?: { advice: string; enableUrl?: string } }>;
+  devices(): Array<{ id: string; name: string; lastSeen: number }>;
+  removeDevices(ids: string[] | "all"): void;
+}
+
 export interface RemoteAsset {
   body: string | Buffer;
   type: string;
@@ -42,6 +68,19 @@ export interface RemoteAsset {
 
 export interface RemoteServerOptions {
   chats(): readonly RemoteChat[];
+  /** This window's name, shown next to its chats on the phone. */
+  windowName?: string;
+  /** Chats of other windows (set on the hub). */
+  members?(): readonly MemberChat[];
+  /**
+   * The routes the other windows use (under /internal/, loopback only, with this
+   * secret). Without it there are none.
+   */
+  internal?: { token: string };
+  /** False while this window is not the hub: the page and the device API then do not answer. Default true. */
+  publicApi?(): boolean;
+  /** Set on the hub. */
+  hubApi?: HubApi;
   devices: DeviceStore;
   pairing: PairingCode;
   /** What devices may do right now (read per request, so a setting change applies at once). */
@@ -67,6 +106,16 @@ interface Client {
   res: http.ServerResponse;
   device: string;
   timer: NodeJS.Timeout;
+  /** Another window of ours, not a device: not counted. */
+  internal?: boolean;
+}
+
+/** A phone's stream of a chat that lives in another window. */
+interface Relay {
+  res: http.ServerResponse;
+  device: string;
+  chatId: string;
+  up: http.IncomingMessage;
 }
 
 interface Feed {
@@ -87,6 +136,8 @@ export class RemoteServer {
   private server?: http.Server;
   private readonly feeds = new Map<string, Feed>();
   private readonly listClients = new Set<Client>();
+  private readonly internalLists = new Set<Client>();
+  private readonly relays = new Set<Relay>();
   private readonly pairLimiter: RateLimiter;
 
   constructor(private readonly opts: RemoteServerOptions) {
@@ -133,6 +184,13 @@ export class RemoteServer {
       this.endClient(c);
     }
     this.listClients.clear();
+    for (const c of this.internalLists) {
+      this.endClient(c);
+    }
+    this.internalLists.clear();
+    for (const r of [...this.relays]) {
+      this.endRelay(r);
+    }
     if (server) {
       server.closeAllConnections?.();
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -141,9 +199,9 @@ export class RemoteServer {
 
   /** Number of open streams (a device with the chat open counts once per chat). */
   get streamCount(): number {
-    let n = this.listClients.size;
+    let n = this.listClients.size + this.relays.size;
     for (const f of this.feeds.values()) {
-      n += f.clients.size;
+      f.clients.forEach((c) => c.internal || n++);
     }
     return n;
   }
@@ -152,15 +210,22 @@ export class RemoteServer {
   get connectedDevices(): string[] {
     const ids = new Set<string>();
     for (const f of this.feeds.values()) {
-      f.clients.forEach((c) => ids.add(c.device));
+      f.clients.forEach((c) => c.internal || ids.add(c.device));
     }
     this.listClients.forEach((c) => ids.add(c.device));
+    this.relays.forEach((r) => ids.add(r.device));
     return [...ids];
   }
 
   /** The set of chats or a title changed: tell lists, and drop streams of chats that are gone. */
   chatsChanged(): void {
-    const live = new Set(this.opts.chats().map((c) => c.id));
+    const live = new Set([...this.opts.chats(), ...(this.opts.members?.() ?? [])].map((c) => c.id));
+    for (const r of [...this.relays]) {
+      if (!live.has(r.chatId)) {
+        r.res.write("event: gone\ndata: {}\n\n");
+        this.endRelay(r);
+      }
+    }
     for (const [id, feed] of [...this.feeds]) {
       if (!live.has(id)) {
         feed.unsubscribe();
@@ -174,6 +239,10 @@ export class RemoteServer {
     const list = JSON.stringify(this.chatList());
     for (const c of this.listClients) {
       this.sse(c, "chats", list);
+    }
+    const own = JSON.stringify(this.internalList());
+    for (const c of this.internalLists) {
+      this.sse(c, "chats", own);
     }
   }
 
@@ -191,6 +260,11 @@ export class RemoteServer {
         this.endClient(c);
       }
     }
+    for (const r of [...this.relays]) {
+      if (r.device === id) {
+        this.endRelay(r);
+      }
+    }
   }
 
   // --- requests ---
@@ -206,6 +280,13 @@ export class RemoteServer {
       const url = new URL(req.url ?? "/", "http://localhost");
       const path = url.pathname;
       const method = req.method ?? "GET";
+
+      if (path.startsWith("/internal/")) {
+        return await this.internalRoute(req, res, method, path, url);
+      }
+      if (this.opts.publicApi && !this.opts.publicApi()) {
+        return this.fail(res, 404, "not found"); // another window answers for remote access
+      }
 
       if (method === "GET" && (path === "/" || path === "/index.html")) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
@@ -255,18 +336,22 @@ export class RemoteServer {
       }
       const m = /^\/api\/chats\/([^/]+)\/(events|message)$/.exec(path);
       if (m) {
-        const chat = this.opts.chats().find((c) => c.id === decodeURIComponent(m[1]));
-        if (!chat) {
+        const id = decodeURIComponent(m[1]);
+        const chat = this.opts.chats().find((c) => c.id === id);
+        const member = chat ? undefined : this.opts.members?.().find((c) => c.id === id);
+        if (!chat && !member) {
           return this.fail(res, 404, "no such chat");
         }
         if (method === "GET" && m[2] === "events") {
           if (!granted.includes("view")) {
             return this.fail(res, 403, "this device may not view chats");
           }
-          return this.openChatStream(req, res, device, chat, url.searchParams.get("last") ?? undefined);
+          const header = req.headers["last-event-id"];
+          const last = typeof header === "string" ? header : (url.searchParams.get("last") ?? undefined);
+          return chat ? this.openChatStream(req, res, device, chat, last) : await this.openRelay(req, res, device, member as MemberChat, last);
         }
         if (method === "POST" && m[2] === "message") {
-          return await this.message(req, res, device, chat, granted);
+          return await this.message(req, res, device, chat ?? (member as MemberChat), granted);
         }
       }
       return this.fail(res, method === "GET" || method === "POST" ? 404 : 405, "not found");
@@ -305,7 +390,7 @@ export class RemoteServer {
     req: http.IncomingMessage,
     res: http.ServerResponse,
     device: DeviceRecord,
-    chat: RemoteChat,
+    chat: RemoteChat | MemberChat,
     granted: readonly Permission[]
   ): Promise<void> {
     const body = await this.readJson(req, res, MAX_BODY);
@@ -319,7 +404,7 @@ export class RemoteServer {
       return this.fail(res, checked.status, checked.reason);
     }
     try {
-      await chat.send(checked.msg, { id: device.id, name: device.name });
+      await chat.send(checked.msg, { id: device.id, name: device.name }, granted);
     } catch (err) {
       this.opts.log?.(`message from ${device.id} failed: ${err instanceof Error ? err.message : String(err)}`);
       return this.fail(res, 500, "the chat could not take that");
@@ -357,15 +442,15 @@ export class RemoteServer {
     res: http.ServerResponse,
     device: DeviceRecord,
     chat: RemoteChat,
-    lastFromQuery: string | undefined
+    lastEventId: string | undefined,
+    internal = false
   ): void {
-    if (this.streamsOf(device.id) >= MAX_STREAMS_PER_DEVICE) {
+    if (!internal && this.streamsOf(device.id) >= MAX_STREAMS_PER_DEVICE) {
       return this.fail(res, 429, "too many open chats on this device");
     }
     const feed = this.feedFor(chat);
-    const client = this.startStream(req, res, device, feed.clients);
-    const header = req.headers["last-event-id"];
-    const last = feed.log.parseId(typeof header === "string" ? header : lastFromQuery);
+    const client = this.startStream(req, res, device, feed.clients, internal);
+    const last = feed.log.parseId(lastEventId);
     const missed = last === undefined ? undefined : feed.log.after(last);
     if (missed) {
       for (const e of missed) {
@@ -379,6 +464,62 @@ export class RemoteServer {
       }
       // The snapshot is as of now: this id is where live messages continue.
       this.sse(client, "sync", "{}", feed.log.idOf(feed.log.lastSeq));
+    }
+    if (!internal) {
+      this.opts.onClients?.();
+    }
+  }
+
+  /** A phone's stream of a chat in another window: the other window's own stream, passed through. */
+  private async openRelay(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    device: DeviceRecord,
+    chat: MemberChat,
+    lastEventId: string | undefined
+  ): Promise<void> {
+    if (this.streamsOf(device.id) >= MAX_STREAMS_PER_DEVICE) {
+      return this.fail(res, 429, "too many open chats on this device");
+    }
+    let up: http.IncomingMessage;
+    try {
+      up = await chat.stream(lastEventId);
+    } catch (err) {
+      this.opts.log?.(`stream of ${chat.window} failed: ${err instanceof Error ? err.message : String(err)}`);
+      return this.fail(res, 502, "that VS Code window does not answer");
+    }
+    if (req.destroyed) {
+      up.destroy();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    const relay: Relay = { res, device: device.id, chatId: chat.id, up };
+    this.relays.add(relay);
+    up.on("data", (chunk: Buffer) => {
+      res.write(chunk);
+      if (res.writableLength > MAX_BUFFERED) {
+        this.opts.log?.(`dropping a slow stream of ${device.id}`);
+        this.endRelay(relay);
+      }
+    });
+    up.on("end", () => this.endRelay(relay));
+    up.on("error", () => this.endRelay(relay));
+    req.on("close", () => this.endRelay(relay));
+    this.opts.onClients?.();
+  }
+
+  private endRelay(r: Relay): void {
+    if (!this.relays.delete(r)) {
+      return;
+    }
+    r.up.destroy();
+    if (!r.res.writableEnded) {
+      r.res.end();
     }
     this.opts.onClients?.();
   }
@@ -396,7 +537,8 @@ export class RemoteServer {
     req: http.IncomingMessage,
     res: http.ServerResponse,
     device: DeviceRecord,
-    into: Set<Client>
+    into: Set<Client>,
+    internal = false
   ): Client {
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -407,12 +549,14 @@ export class RemoteServer {
     res.write("retry: 2000\n\n");
     const timer = setInterval(() => res.write(": ping\n\n"), this.opts.heartbeatMs ?? 15_000);
     timer.unref();
-    const client: Client = { res, device: device.id, timer };
+    const client: Client = { res, device: device.id, timer, internal };
     into.add(client);
     req.on("close", () => {
       clearInterval(timer);
       into.delete(client);
-      this.opts.onClients?.();
+      if (!internal) {
+        this.opts.onClients?.();
+      }
     });
     return client;
   }
@@ -423,6 +567,7 @@ export class RemoteServer {
       f.clients.forEach((c) => c.device === device && n++);
     }
     this.listClients.forEach((c) => c.device === device && n++);
+    this.relays.forEach((r) => r.device === device && n++);
     return n;
   }
 
@@ -446,8 +591,98 @@ export class RemoteServer {
 
   // --- helpers ---
 
-  private chatList(): Array<{ id: string; title: string; busy: boolean }> {
-    return this.opts.chats().map((c) => ({ id: c.id, title: c.title, busy: c.busy }));
+  /** Every chat the phone can open: this window's, then the other windows'. */
+  private chatList(): Array<{ id: string; title: string; busy: boolean; window: string }> {
+    const mine = this.opts.chats().map((c) => ({ id: c.id, title: c.title, busy: c.busy, window: this.windowName() }));
+    const others = (this.opts.members?.() ?? []).map((c) => ({ id: c.id, title: c.title, busy: c.busy, window: c.window }));
+    return [...mine, ...others];
+  }
+
+  private windowName(): string {
+    return this.opts.windowName ?? "VS Code";
+  }
+
+  /** What another window is told about this one's chats. */
+  private internalList(): { window: string; chats: Array<{ id: string; title: string; busy: boolean }> } {
+    return { window: this.windowName(), chats: this.opts.chats().map((c) => ({ id: c.id, title: c.title, busy: c.busy })) };
+  }
+
+  // --- the routes the other windows use ---
+
+  private async internalRoute(req: http.IncomingMessage, res: http.ServerResponse, method: string, path: string, url: URL): Promise<void> {
+    const token = this.opts.internal?.token;
+    const auth = req.headers.authorization;
+    // Loopback Host and the secret: what comes through the tailnet address has neither.
+    if (!token || !isLoopbackHost(req.headers.host) || typeof auth !== "string" || !auth.startsWith("Bearer ") || !safeEqual(hashSecret(auth.slice(7)), hashSecret(token))) {
+      return this.fail(res, 404, "not found");
+    }
+    res.setHeader("Cache-Control", "no-store");
+    const hub = this.opts.hubApi && (this.opts.publicApi?.() ?? true) ? this.opts.hubApi : undefined;
+    const internalDevice: DeviceRecord = { id: "hub", name: "hub", tokenHash: "", createdAt: 0, lastSeen: 0 };
+
+    if (method === "GET" && path === "/internal/chats") {
+      return this.json(res, 200, this.internalList());
+    }
+    if (method === "GET" && path === "/internal/chats/events") {
+      const client = this.startStream(req, res, internalDevice, this.internalLists, true);
+      this.sse(client, "chats", JSON.stringify(this.internalList()));
+      return;
+    }
+    const m = /^\/internal\/chats\/([^/]+)\/(events|message)$/.exec(path);
+    if (m) {
+      const chat = this.opts.chats().find((c) => c.id === decodeURIComponent(m[1]));
+      if (!chat) {
+        return this.fail(res, 404, "no such chat");
+      }
+      if (method === "GET" && m[2] === "events") {
+        const header = req.headers["last-event-id"];
+        return this.openChatStream(req, res, internalDevice, chat, typeof header === "string" ? header : (url.searchParams.get("last") ?? undefined), true);
+      }
+      if (method === "POST" && m[2] === "message") {
+        const body = (await this.readJson(req, res, MAX_BODY)) as { msg?: unknown; device?: { id?: unknown; name?: unknown }; permissions?: unknown } | undefined;
+        if (body === undefined) {
+          return;
+        }
+        // The hub already checked this; checking again costs nothing and covers a bug on either side.
+        const granted = parsePermissionList(body.permissions);
+        const checked = checkRemoteMessage(body.msg, granted);
+        if (!checked.ok) {
+          return this.fail(res, checked.status, checked.reason);
+        }
+        const device = { id: String(body.device?.id ?? "").slice(0, 40), name: cleanDeviceName(body.device?.name) || "Device" };
+        try {
+          await chat.send(checked.msg, device);
+        } catch (err) {
+          this.opts.log?.(`message from ${device.id} failed: ${err instanceof Error ? err.message : String(err)}`);
+          return this.fail(res, 500, "the chat could not take that");
+        }
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+    }
+    if (hub && method === "POST" && path === "/internal/pair-link") {
+      const body = (await this.readJson(req, res, MAX_SMALL_BODY)) as { retry?: unknown } | undefined;
+      if (body === undefined) {
+        return;
+      }
+      return this.json(res, 200, await hub.pairLink(body.retry === true));
+    }
+    if (hub && method === "GET" && path === "/internal/devices") {
+      return this.json(res, 200, hub.devices());
+    }
+    if (hub && method === "POST" && path === "/internal/devices/remove") {
+      const body = (await this.readJson(req, res, MAX_SMALL_BODY)) as { ids?: unknown } | undefined;
+      if (body === undefined) {
+        return;
+      }
+      const ids = body.ids === "all" ? "all" : Array.isArray(body.ids) ? body.ids.filter((i): i is string => typeof i === "string").slice(0, 100) : [];
+      hub.removeDevices(ids);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    return this.fail(res, 404, "not found");
   }
 
   private serveAsset(res: http.ServerResponse, name: string): void {
@@ -554,6 +789,10 @@ export class RemoteServer {
     }
     this.json(res, status, { error });
   }
+}
+
+function parsePermissionList(raw: unknown): Permission[] {
+  return Array.isArray(raw) ? raw.filter((p): p is Permission => p === "view" || p === "prompt" || p === "approve") : [];
 }
 
 function hostName(host: string | undefined): string {

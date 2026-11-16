@@ -92,6 +92,18 @@ Then run **Developer: Reload Window**.
 - [ ] Turn the network off, send a prompt: the message says it is a network error and what to try.
 - [ ] Rate limit (only when it happens): a red line with the engine's message; the reply still finishes.
 
+### Remote access with several windows
+
+Needs two VS Code windows on different folders, each with a chat tab, and a paired phone (see below).
+
+- [ ] Start remote access in window A. Then start it in window B (Remote item in the status bar shows "Remote (shared)" in B). No second Tailscale prompt, and A's phone page keeps working (the earlier bug: B used to take the address from A).
+- [ ] On the phone, open the chat dropdown (left of the toolbar, it names the chat you are on): the list shows "A: ...", "B: ..." chats. Open B's chat, send a prompt: it appears in window B. Switch back with the dropdown.
+- [ ] In B, **Show Remote Access Link** shows a card with a QR code (it asks the other window). **Remove Remote Device…** in B lists the paired devices.
+- [ ] Close window A (the one that started first). Within a few seconds the phone shows the reconnect bar, then B's chats; B's status bar says "Remote" (it is the hub now). No new pairing is needed.
+- [ ] Reopen window A, start remote access: it joins as a member, and its chats show up on the phone.
+- [ ] Stop remote access in the hub window while another window has it on: the other window takes over.
+- [ ] A window where remote access is off shows no chats on the phone.
+
 ### Remote access (Tailscale)
 - [ ] Tailscale off (menu bar item: Disconnect), then Start Remote Access: the notice says Tailscale is turned off and the link is for this Mac only; the page still works on this Mac. Turn Tailscale on and run **Start Remote Access** again: no restart needed, the link becomes `https://<mac>.ts.net:8443/#k=…`.
 - [ ] Before HTTPS certificates and Serve are enabled: the notice has **Open Tailscale Setup**, which opens Tailscale's page. After enabling, Start Remote Access again works.

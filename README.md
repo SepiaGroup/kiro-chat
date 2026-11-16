@@ -167,6 +167,15 @@ open it (or the home screen icon) with Tailscale on: no new link. If Tailscale
 is missing or not ready, remote access still starts for this Mac only
 (`http://127.0.0.1`) and says what to fix.
 
+**Several VS Code windows.** Turn remote access on in each window you want on
+the phone. They share one address, one pairing and one list: the page shows the
+chats of every window ("MyRepo: Chat 1"), and the dropdown at the left of the
+toolbar shows which chat you are on and switches between them. One window (the first) holds the address;
+if it closes or you stop remote access in it, another window takes over within a
+few seconds and the page reconnects by itself. **Show Remote Access Link** and
+**Remove Remote Device…** work from any of the windows. A window where remote
+access is off is not shown.
+
 A paired device stays paired until you remove it (**Remove Remote Device…**).
 Remote access is off by default and when VS Code closes (the extension takes its
 Tailscale share down; nothing else of yours in `tailscale serve` is touched).

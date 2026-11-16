@@ -6,6 +6,8 @@ export interface ChatInfo {
   id: string;
   title: string;
   busy: boolean;
+  /** The VS Code window the chat is in (empty when the server did not say). */
+  window: string;
 }
 
 /** The pairing secret in a URL fragment like `#k=...`; undefined if there is none. */
@@ -21,12 +23,19 @@ export function parseChatList(raw: unknown): ChatInfo[] {
   }
   const out: ChatInfo[] = [];
   for (const item of raw) {
-    const c = item as { id?: unknown; title?: unknown; busy?: unknown } | null;
+    const c = item as { id?: unknown; title?: unknown; busy?: unknown; window?: unknown } | null;
     if (c && typeof c.id === "string" && c.id && typeof c.title === "string") {
-      out.push({ id: c.id, title: c.title.slice(0, 80), busy: c.busy === true });
+      out.push({ id: c.id, title: c.title.slice(0, 80), busy: c.busy === true, window: typeof c.window === "string" ? c.window.slice(0, 80) : "" });
     }
   }
   return out;
+}
+
+/** The text of a chat's button: the window's name too when the chats come from more than one window. */
+export function chatLabel(chat: ChatInfo, all: readonly ChatInfo[]): string {
+  const windows = new Set(all.map((c) => c.window).filter((w) => w));
+  const name = windows.size > 1 && chat.window ? `${chat.window}: ${chat.title}` : chat.title;
+  return chat.busy ? `${name} (working)` : name;
 }
 
 /** The chat to open straight away: the one used last time, or the only one. Undefined = let the user pick. */

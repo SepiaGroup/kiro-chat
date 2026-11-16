@@ -131,6 +131,13 @@ html {
   display: none !important;
 }
 
+/* The chat dropdown at the left of the toolbar: it names the chat being shown. */
+#remote-chats {
+  flex: 0 1 12em;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
 /* A finger needs bigger targets, and a 16px text box so iOS does not zoom in. */
 @media (pointer: coarse) {
   #toolbar button,

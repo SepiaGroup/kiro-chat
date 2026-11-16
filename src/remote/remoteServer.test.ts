@@ -297,7 +297,7 @@ test("chat list, and messages go through the policy to the chat with the device 
     const cookie = await pairDevice(rig);
     const h = { Cookie: cookie };
     const list = await request(rig.port, "GET", "/api/chats", { headers: h });
-    assert.deepEqual(JSON.parse(list.body), [{ id: "c1", title: "First", busy: false }]);
+    assert.deepEqual(JSON.parse(list.body), [{ id: "c1", title: "First", busy: false, window: "VS Code" }]);
 
     const ok = await request(rig.port, "POST", "/api/chats/c1/message", { headers: h, json: { type: "sendPrompt", text: "hello", rule: "x" } });
     assert.equal(ok.status, 204);
@@ -500,7 +500,7 @@ test("the chat list stream updates, and a chat that goes away ends its streams",
     const list = await openStream(rig.port, "/api/chats/events", { Cookie: cookie });
     const chat = await openStream(rig.port, "/api/chats/c1/events", { Cookie: cookie });
     await until("first list", () => list.events.some((e) => e.event === "chats"));
-    assert.deepEqual(JSON.parse(list.events[0].data), [{ id: "c1", title: "First", busy: false }]);
+    assert.deepEqual(JSON.parse(list.events[0].data), [{ id: "c1", title: "First", busy: false, window: "VS Code" }]);
 
     rig.chats[0].title = "Renamed";
     rig.chats.push(new FakeChat("c2", "Second"));

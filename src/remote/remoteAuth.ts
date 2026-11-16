@@ -91,6 +91,16 @@ export class DeviceStore {
     }
   }
 
+  /** Replace every record (the saved list was read again). */
+  reset(records: readonly DeviceRecord[]): void {
+    this.byHash.clear();
+    for (const r of records) {
+      if (r && typeof r.tokenHash === "string" && typeof r.id === "string") {
+        this.byHash.set(r.tokenHash, { ...r, name: cleanDeviceName(r.name) || "Device" });
+      }
+    }
+  }
+
   /** Register a device; the returned token goes into its cookie and nowhere else. */
   add(name: string): { device: DeviceRecord; token: string } {
     const token = newSecret();

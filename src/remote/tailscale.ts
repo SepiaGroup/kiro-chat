@@ -126,6 +126,17 @@ export function existingServe(statusJson: string, dnsName: string, httpsPort: nu
   return ours ? "loopbackProxy" : "other";
 }
 
+/** The local port a single loopback proxy on `dnsName:httpsPort` points at, if that is what is there. */
+export function existingProxyPort(statusJson: string, dnsName: string, httpsPort: number): number | undefined {
+  try {
+    const proxy = JSON.parse(statusJson).Web?.[`${dnsName}:${httpsPort}`]?.Handlers?.["/"]?.Proxy;
+    const m = typeof proxy === "string" ? /^http:\/\/(?:127\.0\.0\.1|localhost):(\d+)\/?$/.exec(proxy) : null;
+    return m ? Number(m[1]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type ServeOutcome =
   | { ok: true }
   | { ok: false; advice: string; /** Where to switch Serve on, when Tailscale asked for it. */ enableUrl?: string };
@@ -170,7 +181,9 @@ export class TailscaleServe {
 
   constructor(
     private readonly run: Run = nodeRun,
-    private readonly log: (line: string) => void = () => undefined
+    private readonly log: (line: string) => void = () => undefined,
+    /** Whether something listens on a local port (the guard below). */
+    private readonly isAlive: (port: number) => Promise<boolean> = async () => false
   ) {}
 
   get active(): boolean {
@@ -191,11 +204,21 @@ export class TailscaleServe {
     if (status.kind === "unavailable") {
       return { ok: false, advice: status.advice };
     }
-    const existing = existingServe((await this.run(cli, ["serve", "status", "--json"], 8000)).stdout, status.dnsName, httpsPort);
+    const serveJson = (await this.run(cli, ["serve", "status", "--json"], 8000)).stdout;
+    const existing = existingServe(serveJson, status.dnsName, httpsPort);
     if (existing === "other") {
       return {
         ok: false,
         advice: `Port ${httpsPort} is already used by one of your Tailscale Serve settings. Pick another with kiroCliChat.remote.httpsPort (443, 8443 or 10000).`,
+      };
+    }
+    // A proxy to another port that still answers belongs to someone else (another window, an
+    // older version): taking it over would cut them off. One to a dead port is left over from a crash.
+    const other = existing === "loopbackProxy" ? existingProxyPort(serveJson, status.dnsName, httpsPort) : undefined;
+    if (other !== undefined && other !== localPort && (await this.isAlive(other))) {
+      return {
+        ok: false,
+        advice: `Port ${httpsPort} is already shared for a program on local port ${other} (maybe another VS Code window). Pick another with kiroCliChat.remote.httpsPort (443, 8443 or 10000).`,
       };
     }
     const r = await this.run(cli, serveArgs(localPort, httpsPort), 8000);

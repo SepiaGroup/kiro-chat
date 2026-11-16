@@ -4,7 +4,7 @@
 // page's messages to the extension. Loaded before webview.js, which asks for
 // `acquireVsCodeApi()` as soon as it runs.
 
-import { ChatInfo, fragmentSecret, GATE_TEXT, GateKind, parseChatList, pickChat } from "./remoteBoot";
+import { ChatInfo, chatLabel, fragmentSecret, GATE_TEXT, GateKind, parseChatList, pickChat } from "./remoteBoot";
 
 type Msg = { type: string; [k: string]: unknown };
 
@@ -62,6 +62,51 @@ bar.className = "remote-bar hidden";
 bar.setAttribute("role", "status");
 bar.textContent = "Reconnecting…";
 
+// The chat being shown, and a way to change it: every chat of every window that shares remote access.
+const chatSelect = document.createElement("select");
+chatSelect.id = "remote-chats";
+chatSelect.className = "toolbar-model";
+chatSelect.title = "Chat";
+chatSelect.setAttribute("aria-label", "Chat");
+chatSelect.addEventListener("change", () => chatSelect.value && openChat(chatSelect.value));
+document.getElementById("toolbar")?.prepend(chatSelect);
+let knownChats: ChatInfo[] = [];
+let listSource: EventSource | undefined;
+
+function renderChatSelect(): void {
+  chatSelect.replaceChildren(
+    ...knownChats.map((c) => {
+      const o = document.createElement("option");
+      o.value = c.id;
+      o.textContent = chatLabel(c, knownChats);
+      return o;
+    })
+  );
+  chatSelect.value = chatId ?? "";
+}
+
+/** Keep the dropdown current while the page is open (chats come and go, in any window). */
+function followChats(): void {
+  if (listSource) {
+    return;
+  }
+  const es = new EventSource("/api/chats/events");
+  listSource = es;
+  es.addEventListener("chats", (e) => {
+    try {
+      knownChats = parseChatList(JSON.parse((e as MessageEvent<string>).data));
+      renderChatSelect();
+    } catch {
+      // A malformed update is skipped; the next one replaces it.
+    }
+  });
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) {
+      listSource = undefined; // refused (unpaired): the chat's own stream says so
+    }
+  };
+}
+
 document.body.append(gate, bar);
 document.body.classList.add("remote-page");
 document.getElementById("input")?.setAttribute("placeholder", "Message Kiro…");
@@ -82,15 +127,14 @@ function showGate(kind: GateKind, chats: readonly ChatInfo[] = []): void {
   closeStream();
   bar.classList.add("hidden");
   gateText.textContent = GATE_TEXT[kind];
-  gateList.replaceChildren(
-    ...chats.map((c) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = c.busy ? `${c.title} (working)` : c.title;
-      b.addEventListener("click", () => openChat(c.id));
-      return b;
-    })
-  );
+  const buttons = chats.map((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = chatLabel(c, chats);
+    b.addEventListener("click", () => openChat(c.id));
+    return b;
+  });
+  gateList.replaceChildren(...buttons);
   gate.classList.remove("hidden");
 }
 
@@ -163,6 +207,8 @@ function openChat(id: string): void {
     // Storage can be blocked; the chat just is not remembered.
   }
   hideGate();
+  followChats();
+  renderChatSelect();
   const es = new EventSource(`/api/chats/${encodeURIComponent(id)}/events`);
   source = es;
   es.onmessage = (e) => {
