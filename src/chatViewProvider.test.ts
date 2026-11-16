@@ -247,7 +247,7 @@ test("/title renames the tab, its saved state and the remote list; clear gives i
   assert.equal(chat.title, "Build fix");
   assert.equal(changes, 1);
   assert.deepEqual(tab.webview.sent.filter((m) => m.type === "titleState").at(-1), { type: "titleState", title: "Build fix", defaultTitle: "Kiro Chat 2" });
-  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.text === "Title set to Build fix (tab and session)."));
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.text === "Title set to Build fix."));
   assert.ok(!tab.webview.sent.some((m) => m.type === "userMessage"), "not sent to the agent");
   tab.webview.messages.fire({ type: "sendPrompt", text: "/title", images: [] });
   await tick();
@@ -269,7 +269,7 @@ test("a renamed tab comes back renamed after a reload, and a reset still knows i
   assert.equal(chat.title, "Build");
   p.newTab();
   assert.equal(created[0].title, "Kiro Chat 4");
-  await chat.rename(undefined);
+  chat.rename(undefined);
   assert.equal(restored.title, "Kiro Chat 3");
 });
 
@@ -294,7 +294,7 @@ test("the panel view's name follows a rename", async () => {
   p.resolveWebviewView(view as any, { state: { title: "Notes" } } as any);
   assert.equal(view.title, "Notes");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (p as any).panelChat.rename(undefined);
+  (p as any).panelChat.rename(undefined);
   assert.equal(view.title, undefined);
 });
 
@@ -329,4 +329,50 @@ test("Rename Chat from a tab's context menu renames the tab clicked, not the cur
   await p.renameChat(0);
   assert.equal(t1.title, "First", "another extension's webview is left alone");
   tabGroups.all = [];
+});
+
+test("a restored name without its saved own name doesn't become the name a reset goes back to", () => {
+  const p = makeProvider();
+  const restored = new FakePanel("Build");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p.adoptEditorPanel(restored as any, { sessionId: "s", title: "Build" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(restored);
+  assert.equal(chat.title, "Build");
+  chat.rename(undefined);
+  assert.equal(restored.title, "Kiro Chat");
+});
+
+test("the session gets the name once the engine runs, a failure says so, and a slow engine doesn't hold up the notice", async () => {
+  const p = makeProvider();
+  p.newTab();
+  const tab = created[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(tab);
+  chat.ensureStarted = () => Promise.resolve();
+  tab.webview.messages.fire({ type: "ready" });
+  await tick();
+  chat.rename("Early"); // no engine yet: nothing to send
+  const sent: unknown[] = [];
+  let fail = false;
+  const client = {
+    extMethod: (m: string, params: unknown) => {
+      sent.push([m, params]);
+      return fail ? Promise.reject(new Error("boom")) : new Promise(() => undefined); // never answers
+    },
+  };
+  chat.transport = { mode: "persistent", client };
+  chat.engineTitle = undefined;
+  chat.sendTitle(); // what start does once the engine is up
+  assert.deepEqual(sent, [["_kiro/session/rename", { title: "Early" }]]);
+  chat.sendTitle();
+  assert.equal(sent.length, 1, "sent once");
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title Later", images: [] });
+  await tick();
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.text === "Title set to Later."), "not held up by the engine");
+  fail = true;
+  chat.rename("Broken");
+  await tick();
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.isError && String(m.text).includes("could not be changed: boom")));
+  chat.transport = undefined;
 });

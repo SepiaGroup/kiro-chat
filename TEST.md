@@ -80,6 +80,7 @@ Then run **Developer: Reload Window**.
 - [ ] In a chat tab, type `/` and pick **title**. `/title Build` renames the tab to "Build" and says "Title set to Build (tab and session)."; nothing goes to the agent. `/title` shows the name.
 - [ ] Reload the window: the tab is still "Build". `/title clear` gives it its own name back ("Kiro Chat 2"), also after the reload. A new tab gets the next number.
 - [ ] **Kiro CLI Chat: Rename Chat…** with the tab active: the box shows the name selected. A new name renames it; Esc keeps it; an empty name resets it.
+- [ ] On the phone, typing `/` doesn't offer `/title`. A chat renamed before its engine started (right after a reload) shows the new name in Resume.
 - [ ] Right-click a chat tab that is not the current one: **Rename Chat…** renames that tab, not the current one, also with tabs in two editor groups. On another webview tab (Markdown preview) it says it renames Kiro chat tabs and does nothing.
 - [ ] The same in the bottom-panel chat: the view's title changes, and comes back after a reload.
 - [ ] With remote access on, the phone's chat list shows the new name within a moment. **Resume** in another chat lists the session under the new name.

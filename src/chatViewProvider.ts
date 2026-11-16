@@ -116,9 +116,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Wire up a chat tab (new, or restored by VS Code after a reload). */
   adoptEditorPanel(panel: vscode.WebviewPanel, state?: ChatState): void {
     panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, "media", "icon.svg");
-    // A renamed tab comes back with its new name; its own name is in the state.
+    // A renamed tab comes back with its new name; its own name is in the
+    // state. Without it (a damaged state) the tab's title is the custom name,
+    // which must not become the name a reset goes back to.
     const custom = titleOf(state);
-    const own = custom && typeof state?.defaultTitle === "string" && state.defaultTitle ? state.defaultTitle : panel.title;
+    const saved = typeof state?.defaultTitle === "string" ? state.defaultTitle.trim() : "";
+    const own = !custom ? panel.title : saved || "Kiro Chat";
     // Keep numbering going after restored tabs ("Kiro Chat 3" -> next is 4).
     const num = /^Kiro Chat(?: (\d+))?$/.exec(own);
     if (num) {
@@ -212,7 +215,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       valueSelection: [0, chat.title.length],
     });
     if (name !== undefined) {
-      await chat.rename(name);
+      chat.rename(name);
     }
   }
 

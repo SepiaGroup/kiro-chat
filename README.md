@@ -84,10 +84,14 @@ Open Chat** opens the chat as an editor tab (set `kiroCliChat.openIn` to
 - **Input.** One line that grows as you type. Enter sends, Shift+Enter adds a
   line. Type `/` for a picker of the engine's commands, agents and skills.
 - **Renaming a chat.** `/title <name>`, **Rename Chat…** on the tab's
-  right-click menu or **Kiro CLI Chat: Rename Chat…** renames the chat: its tab (or the panel view), the list on a remote
+  right-click menu or **Kiro CLI Chat: Rename Chat…** renames the chat: its
+  tab (or the panel view), the list on a remote
   device and the session in Resume. The name stays after a reload. `/title`
   shows the name, and `/title clear` (or an empty name in Rename Chat) gives
-  the chat its own name back ("Kiro Chat 2").
+  the chat its own name back ("Kiro Chat 2"), so a chat can't be named
+  `clear`. Resume keeps the last name after a reset. The right-click item
+  shows on other webview tabs too (VS Code can't limit it to chat tabs);
+  there it only says so.
 - **Resume** lists previous sessions for this folder (title, age, message
   count). **Restart** asks before restarting the engine and clearing the chat.
   Clicking outside the Resume or Settings panel (or Esc) closes it.
@@ -214,7 +218,7 @@ terminal's conversation since the terminal opened (or since `/clear`, `/new` or
 | Kiro CLI Chat: New Session | Asks, then starts a fresh conversation in the current chat. |
 | Kiro CLI Chat: Resume Previous Session | Opens the current chat's Resume panel. |
 | Kiro CLI Chat: Restart Engine | Asks, then restarts the current chat's engine. |
-| Kiro CLI Chat: Rename Chat… | Renames the current chat (empty: back to its own name). |
+| Kiro CLI Chat: Rename Chat… | Renames the current chat, or the tab right-clicked (empty: back to its own name). |
 | Kiro CLI Chat: Log In | Runs `kiro-cli login` in a terminal. |
 | Kiro CLI Chat: Attach Image or File | File picker; images attach, other files insert their path. |
 | Kiro CLI Chat: Start / Stop Remote Access | Starts or stops the remote access server. |

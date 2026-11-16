@@ -84,6 +84,8 @@ export class ChatSession implements RemoteChat {
   private pendingUiMessage?: unknown;
   // A name given with /title or Rename Chat (the label is the name it opened with).
   private customTitle?: string;
+  /** The name the engine's session was last given (Resume lists it). */
+  private engineTitle?: string;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -148,22 +150,36 @@ export class ChatSession implements RemoteChat {
 
   /**
    * Rename the chat (undefined or blank: back to its own name). The tab, the
-   * remote chat list and the saved state follow; a new name also goes to the
-   * engine's session, so Resume lists it, as /title does in the terminal chat.
+   * remote chat list and the saved state follow at once. A new name also goes
+   * to the engine's session, so Resume lists it, now or once the engine has
+   * started. A reset is not sent: the engine has no "no name", so Resume keeps
+   * the last name, as with /title clear in the terminal chat.
    */
-  async rename(title: string | undefined): Promise<void> {
+  rename(title: string | undefined): void {
     this.customTitle = cleanTitle(title);
     this.hooks.renamed?.(this, this.customTitle);
     this.hooks.changed?.(this);
     this.pushTitleState();
+    this.sendTitle();
+  }
+
+  /** Give the engine's session the chat's name, if it doesn't have it. Not awaited: a slow engine doesn't hold up the tab. */
+  private sendTitle(): void {
     const t = this.transport;
-    if (this.customTitle && t?.mode === "persistent") {
-      try {
-        await t.client.extMethod("_kiro/session/rename", { title: this.customTitle });
-      } catch (err) {
-        this.log("rename failed: " + errorMessage(err));
-      }
+    const title = this.customTitle;
+    if (!title || title === this.engineTitle || t?.mode !== "persistent") {
+      return;
     }
+    this.engineTitle = title;
+    t.client.extMethod("_kiro/session/rename", { title }).catch((err: unknown) => {
+      if (this.engineTitle === title) {
+        this.engineTitle = undefined;
+      }
+      this.log("rename failed: " + errorMessage(err));
+      if (!this.disposed && this.transport === t) {
+        this.post({ type: "notice", text: `The tab is renamed, but the session's name in Resume could not be changed: ${errorMessage(err)}`, isError: true });
+      }
+    });
   }
 
   /** The desktop page saves the name with its state, so a reload keeps it. Not recorded. */
@@ -181,11 +197,11 @@ export class ChatSession implements RemoteChat {
     if (!arg) {
       this.post({ type: "notice", text: `Title: ${this.title}  (/title <name> to change, /title clear to reset)` });
     } else if (arg.toLowerCase() === "clear") {
-      await this.rename(undefined);
+      this.rename(undefined);
       this.post({ type: "notice", text: "Title reset." });
     } else {
-      await this.rename(arg);
-      this.post({ type: "notice", text: `Title set to ${this.title} (tab and session).` });
+      this.rename(arg);
+      this.post({ type: "notice", text: `Title set to ${this.title}.` });
     }
     return true;
   }
@@ -625,6 +641,8 @@ export class ChatSession implements RemoteChat {
             return;
           }
           this.transport = { mode: "persistent", client };
+          this.engineTitle = undefined; // a new engine: give its session the name (set before it started, or restored)
+          this.sendTitle();
           // The engine reports autopilot "on" by default, but approvals are
           // decided by kiroCliChat.autopilot; align the engine option (and so
           // the Settings checkbox) with it.

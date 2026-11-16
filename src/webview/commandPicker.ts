@@ -57,7 +57,9 @@ export function updatePicker(): void {
     return;
   }
   const ql = q.toLowerCase();
-  pickerMatches = allCommands.filter((c) => c.name.toLowerCase().includes(ql));
+  // A remote device's /title goes to the agent as text, so it isn't offered there.
+  const remote = document.body.classList.contains("remote-page");
+  pickerMatches = allCommands.filter((c) => c.name.toLowerCase().includes(ql) && !(remote && c.name === "title" && c.type === "builtin"));
   if (pickerMatches.length === 0) {
     hidePicker();
     return;
