@@ -7,7 +7,7 @@ First release.
 - `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
 - Remote access shows terminal chats too: watch them, prompt, stop, and answer approvals and questions from the phone.
 - Fixed: a prompt from the phone to a chat in another window said "Not sent" when the reply took more than a few seconds.
-- Rename a chat tab or the panel chat with `/title <name>` or **Rename Chat…**. The name is kept after a reload and shown on a remote device.
+- Rename a chat tab or the panel chat with `/title <name>` or **Rename Chat…** (Command Palette or the tab's right-click menu). The name is kept after a reload and shown on a remote device.
 - A chat's history in memory is limited to about 32 MB: images in the oldest messages go first.
 - Remote access with several windows: no two windows can hold the hub at once (lock files are written whole and a stale lock is removed safely), process ids reused after a restart no longer keep an old window listed, and calls between windows close when they time out.
 - Fixed: reply text written after a tool call was added to the reply above the tool cards, so the end of a long answer seemed missing.

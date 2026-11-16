@@ -85,7 +85,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("kiroCliChat.restart", async () => {
       await provider.confirmRestart();
     }),
-    vscode.commands.registerCommand("kiroCliChat.renameChat", () => provider.renameChat()),
+    // From a tab's context menu VS Code passes the tab's place: (resource, { groupId, editorIndex }).
+    vscode.commands.registerCommand("kiroCliChat.renameChat", (_resource?: unknown, tab?: { editorIndex?: unknown }) =>
+      provider.renameChat(typeof tab?.editorIndex === "number" ? tab.editorIndex : undefined)
+    ),
     vscode.commands.registerCommand("kiroCliChat.login", async () => {
       await reveal();
       await provider.login();

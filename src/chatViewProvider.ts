@@ -185,9 +185,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     await this.target()?.login();
   }
 
-  /** Rename the current chat (Rename Chat command). An empty name gives it its own name back. */
-  async renameChat(): Promise<void> {
-    const chat = this.target();
+  /**
+   * Rename a chat (Rename Chat command). An empty name gives it its own name
+   * back. `editorIndex`: it came from a tab's context menu, so rename that tab.
+   */
+  async renameChat(editorIndex?: number): Promise<void> {
+    let chat: ChatSession | undefined;
+    if (editorIndex === undefined) {
+      chat = this.target();
+    } else {
+      const clicked = this.clickedChat(editorIndex);
+      if (clicked === null) {
+        void vscode.window.showInformationMessage("Rename Chat renames Kiro chat tabs. Use it on a Kiro Chat tab.");
+        return;
+      }
+      chat = clicked ?? this.target();
+    }
     if (!chat) {
       void vscode.window.showInformationMessage("Open a chat first.");
       return;
@@ -207,6 +220,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   setRemoteAccess(control: RemoteAccessControl, changes: vscode.Event<void>): vscode.Disposable {
     this.remoteControl = control;
     return changes(() => this.chats().forEach((c) => c.pushRemoteState()));
+  }
+
+  /**
+   * The chat of the tab right-clicked: VS Code gives its index in its group
+   * but not the group in a form the API has, so look at that index in every
+   * group. null: no Kiro chat there; undefined: can't tell (several match).
+   */
+  private clickedChat(editorIndex: number): ChatSession | null | undefined {
+    const hits: Array<{ tab: vscode.Tab; column: vscode.ViewColumn }> = [];
+    for (const group of vscode.window.tabGroups.all) {
+      const tab = group.tabs[editorIndex];
+      if (tab?.input instanceof vscode.TabInputWebview && tab.input.viewType.endsWith(ChatViewProvider.editorViewType)) {
+        hits.push({ tab, column: group.viewColumn });
+      }
+    }
+    if (hits.length === 0) {
+      return null;
+    }
+    if (hits.length > 1) {
+      return undefined;
+    }
+    const { tab, column } = hits[0];
+    const panels = [...this.tabs.keys()].filter((p) => p.title === tab.label && p.viewColumn === column);
+    return panels.length === 1 ? this.tabs.get(panels[0]) : undefined;
   }
 
   /** Every open chat: the panel view's and each tab's. */

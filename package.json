@@ -68,7 +68,8 @@
       },
       {
         "command": "kiroCliChat.renameChat",
-        "title": "Kiro CLI Chat: Rename Chat…"
+        "title": "Rename Chat…",
+        "category": "Kiro CLI Chat"
       },
       {
         "command": "kiroCliChat.login",
@@ -255,6 +256,13 @@
       }
     },
     "menus": {
+      "editor/title/context": [
+        {
+          "command": "kiroCliChat.renameChat",
+          "when": "resourceScheme == webview-panel",
+          "group": "1_kiro"
+        }
+      ],
       "view/title": [
         {
           "command": "kiroCliChat.newChatTab",

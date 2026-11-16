@@ -39,7 +39,13 @@ class FakeWebview {
   }
 }
 
+class TabInputWebview {
+  constructor(readonly viewType: string) {}
+}
+const tabGroups: { all: Array<{ viewColumn: number; tabs: Array<{ label: string; input: unknown }> }> } = { all: [] };
+
 class FakePanel {
+  viewColumn = 1;
   readonly webview = new FakeWebview();
   active = true;
   iconPath: unknown;
@@ -63,6 +69,7 @@ const fakeVscode = {
     file: (p: string) => ({ fsPath: p }),
   },
   ViewColumn: { Active: -1, Beside: -2 },
+  TabInputWebview,
   window: {
     createWebviewPanel: (_type: string, title: string) => {
       const p = new FakePanel(title);
@@ -72,6 +79,7 @@ const fakeVscode = {
     showWarningMessage: () => Promise.resolve(undefined),
     showInformationMessage: () => Promise.resolve(undefined),
     showInputBox: () => Promise.resolve(inputBoxAnswer),
+    tabGroups,
   },
   workspace: { workspaceFolders: undefined, getConfiguration: () => ({ get: (_k: string, d: unknown) => d }) },
 };
@@ -297,4 +305,28 @@ test("a chat name is one short line", () => {
   assert.equal(cleanTitle("   "), undefined);
   assert.equal(cleanTitle(3), undefined);
   assert.equal(cleanTitle("x".repeat(100))?.length, 80);
+});
+
+test("Rename Chat from a tab's context menu renames the tab clicked, not the current one", async () => {
+  const p = makeProvider();
+  p.newTab();
+  p.newTab();
+  const [t1, t2] = created;
+  t2.viewColumn = 2;
+  const chatTab = (label: string) => ({ label, input: new TabInputWebview("mainThreadWebview-kiroCliChat.editor") });
+  tabGroups.all = [
+    { viewColumn: 1, tabs: [{ label: "notes.md", input: {} }, chatTab("Kiro Chat")] },
+    { viewColumn: 2, tabs: [chatTab("Kiro Chat 2")] },
+  ];
+  inputBoxAnswer = "First";
+  await p.renameChat(1); // the current chat is tab 2; the click was on tab 1
+  assert.equal(t1.title, "First");
+  assert.equal(t2.title, "Kiro Chat 2");
+  inputBoxAnswer = "Second";
+  await p.renameChat(0); // index 0: a file in group 1, the chat in group 2
+  assert.equal(t2.title, "Second");
+  tabGroups.all = [{ viewColumn: 1, tabs: [{ label: "Preview", input: new TabInputWebview("markdown.preview") }] }];
+  await p.renameChat(0);
+  assert.equal(t1.title, "First", "another extension's webview is left alone");
+  tabGroups.all = [];
 });

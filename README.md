@@ -83,8 +83,8 @@ Open Chat** opens the chat as an editor tab (set `kiroCliChat.openIn` to
   and the chat says so. Works in both chats.
 - **Input.** One line that grows as you type. Enter sends, Shift+Enter adds a
   line. Type `/` for a picker of the engine's commands, agents and skills.
-- **Renaming a chat.** `/title <name>` or **Kiro CLI Chat: Rename Chat…**
-  renames the current chat: its tab (or the panel view), the list on a remote
+- **Renaming a chat.** `/title <name>`, **Rename Chat…** on the tab's
+  right-click menu or **Kiro CLI Chat: Rename Chat…** renames the chat: its tab (or the panel view), the list on a remote
   device and the session in Resume. The name stays after a reload. `/title`
   shows the name, and `/title clear` (or an empty name in Rename Chat) gives
   the chat its own name back ("Kiro Chat 2").
