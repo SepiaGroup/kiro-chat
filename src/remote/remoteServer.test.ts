@@ -11,6 +11,8 @@ class FakeChat implements RemoteChat {
   sent: Array<{ msg: RemoteMessage; device: { id: string; name: string } }> = [];
   listeners = new Set<(msg: unknown) => void>();
   failSend = false;
+  /** send() lasts until this is called (a prompt waits for its reply). */
+  hang?: Promise<void>;
   constructor(
     readonly id: string,
     public title = "Kiro Chat"
@@ -23,6 +25,7 @@ class FakeChat implements RemoteChat {
       throw new Error("boom");
     }
     this.sent.push({ msg, device });
+    await this.hang;
   }
   subscribe(listener: (msg: unknown) => void): () => void {
     this.listeners.add(listener);
@@ -639,5 +642,22 @@ test("a refused internal call is logged with the reason, never the token", async
     ]);
   } finally {
     await server.stop();
+  }
+});
+
+test("a prompt is answered once the chat has it, not when the reply ends", async () => {
+  const rig = await boot();
+  let finish!: () => void;
+  rig.chats[0].hang = new Promise<void>((r) => (finish = r));
+  try {
+    const cookie = await pairDevice(rig);
+    const started = Date.now();
+    const r = await request(rig.port, "POST", "/api/chats/c1/message", { json: { type: "sendPrompt", text: "hi" }, headers: { Cookie: cookie } });
+    assert.equal(r.status, 204);
+    assert.ok(Date.now() - started < 3000);
+    assert.equal(rig.chats[0].sent.length, 1);
+  } finally {
+    finish();
+    await rig.server.stop();
   }
 });

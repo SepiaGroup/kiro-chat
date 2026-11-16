@@ -158,7 +158,8 @@ export class TerminalCommands {
 
   // --- /compact ---
 
-  async compact(): Promise<void> {
+  /** Also run for a remote device, which gets the same result. */
+  async compact(): Promise<{ ok: boolean; message: string }> {
     const client = this.host.client();
     const before = this.host.contextPercent();
     const res = await this.host.runBusy("Compacting", () =>
@@ -169,10 +170,13 @@ export class TerminalCommands {
       await delay(400);
       const after = this.host.contextPercent();
       const change = before !== undefined && after !== undefined ? ` Context: ${before.toFixed(0)}% → ${after.toFixed(0)}%.` : "";
-      this.host.print(style.gray("Conversation compacted." + change));
-    } else {
-      this.host.print(style.yellow("Couldn't compact right now (a reply may still be running, or there's nothing to compact)."));
+      const message = "Conversation compacted." + change;
+      this.host.print(style.gray(message));
+      return { ok: true, message };
     }
+    const message = "Couldn't compact right now (a reply may still be running, or there's nothing to compact).";
+    this.host.print(style.yellow(message));
+    return { ok: false, message };
   }
 
   // --- /usage ---

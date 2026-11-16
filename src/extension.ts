@@ -5,6 +5,7 @@ import { ChatViewProvider } from "./chatViewProvider";
 import { trackActiveEditor } from "./config";
 import { RemoteController } from "./remote/remoteController";
 import { TerminalChat } from "./terminal/terminalChat";
+import { TerminalChats } from "./terminal/terminalRemote";
 
 export function activate(context: vscode.ExtensionContext): void {
   // `log: true` also persists the channel to the extension's log folder, which
@@ -32,9 +33,9 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  registerTerminalChat(context, output);
+  const terminals = registerTerminalChat(context, output);
 
-  const remote = new RemoteController(context, output, provider);
+  const remote = new RemoteController(context, output, provider, terminals);
   context.subscriptions.push(
     remote,
     provider.setRemoteAccess(remote, remote.onDidChange),
@@ -103,14 +104,15 @@ export function deactivate(): void {
  * Text-mode chats in the Terminal panel: a "Kiro Chat" terminal profile (shows
  * in the terminal "+" dropdown) and a command. Each terminal is independent.
  */
-function registerTerminalChat(context: vscode.ExtensionContext, output: vscode.OutputChannel): void {
+function registerTerminalChat(context: vscode.ExtensionContext, output: vscode.OutputChannel): TerminalChats {
+  const terminals = new TerminalChats();
   let count = 0;
   const makeOptions = (initialPrompt?: string): vscode.ExtensionTerminalOptions => {
     count++;
     const name = count === 1 ? "Kiro Chat" : `Kiro Chat ${count}`;
     return {
       name,
-      pty: new TerminalChat(output, name, { initialPrompt, spawn: openChat }),
+      pty: new TerminalChat(output, name, { initialPrompt, spawn: openChat, remote: terminals }),
       iconPath: new vscode.ThemeIcon("comment-discussion"),
     };
   };
@@ -138,4 +140,5 @@ function registerTerminalChat(context: vscode.ExtensionContext, output: vscode.O
   };
   update(vscode.window.activeTerminal);
   context.subscriptions.push(vscode.window.onDidChangeActiveTerminal(update));
+  return terminals;
 }

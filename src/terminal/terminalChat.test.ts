@@ -115,6 +115,8 @@ mod._load = function (req: string, ...rest: unknown[]) {
 // Loaded after the fake is installed, so it can't be a hoisted `import`.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { TerminalChat } = require("./terminalChat") as typeof import("./terminalChat");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { TerminalChats } = require("./terminalRemote") as typeof import("./terminalRemote");
 
 async function until(what: string, cond: () => boolean, ms = 10000): Promise<void> {
   const end = Date.now() + ms;
@@ -226,4 +228,61 @@ test("a line typed while the agent works is sent to it as a steering message", a
   } finally {
     chat.close();
   }
+});
+
+test("remote access: a phone sees the terminal chat, prompts it, and answers approvals and questions", async () => {
+  const chats = new TerminalChats();
+  let listChanges = 0;
+  chats.onDidChangeChats(() => listChanges++);
+  const chat = new TerminalChat({ appendLine: () => undefined } as never, "Kiro Chat", { remote: chats });
+  let screen = "";
+  chat.onDidWrite((s) => (screen += s));
+  const text = () => stripAnsi(screen).replace(/\r\n/g, "\n");
+  const phone = { id: "d1", name: "iPhone" };
+  chat.open({ columns: 100, rows: 30 });
+  try {
+    assert.equal(chats.chats().length, 1);
+    const remote = chats.chats()[0];
+    assert.equal(remote.title, "Kiro Chat (terminal)");
+    await until("ready", () => text().includes("Ready · engine v3"));
+    const seen: Array<{ type: string; text?: string; event?: { kind: string; label?: string } }> = [];
+    remote.subscribe((m) => seen.push(m as (typeof seen)[number]));
+    assert.ok(remote.snapshot().some((m) => (m as { type: string }).type === "ready"));
+
+    // A prompt from the phone, and the approval answered there.
+    const turn = remote.send({ type: "sendPrompt", text: "list files", images: [] }, phone);
+    await until("approval", () => text().includes("[y] Allow"));
+    assert.equal(remote.busy, true);
+    assert.match(text(), /> list files {2}\(from iPhone\)/);
+    await remote.send({ type: "approve", toolCallId: "tc1", optionId: "allow" }, phone);
+    await turn;
+    assert.match(text(), /✓ Allowed from iPhone: find \./);
+    assert.match(text(), /All done\./);
+    assert.ok(seen.some((m) => m.type === "userMessage" && m.text === "list files"));
+    assert.ok(seen.some((m) => m.event?.kind === "approvalResolved" && m.event.label === "Allowed from iPhone"));
+    assert.ok(seen.some((m) => m.event?.kind === "assistantChunk"));
+    assert.ok(!remote.snapshot().some((m) => (m as { event?: { kind: string } }).event?.kind === "approvalRequest"), "no card comes back");
+    assert.ok(listChanges >= 2, "busy and idle reach the chat list");
+
+    // A "/" line from the phone goes to the agent: it never runs a terminal command.
+    const asked = remote.send({ type: "sendPrompt", text: "/quit ask me", images: [] }, phone);
+    await until("question", () => text().includes("[2] blue (recommended)"));
+    await remote.send({ type: "answerQuestion", toolCallId: "q1", answer: "red" }, phone);
+    await asked;
+    assert.match(text(), /Answered from iPhone: red/);
+    assert.match(text(), /You picked \{"action":"answered","answer":"red"\}/);
+    assert.ok(seen.some((m) => m.event?.kind === "questionResolved" && m.event.label === "Answered from iPhone: red"));
+
+    // Answered at the keyboard: the phone is told, and by whom.
+    for (const ch of "list files") {
+      chat.handleInput(ch);
+    }
+    chat.handleInput("\r");
+    await until("second approval", () => text().split("[y] Allow").length > 2);
+    chat.handleInput("y");
+    await until("second footer", () => seen.some((m) => m.event?.kind === "approvalResolved" && m.event.label === "Allowed in the terminal"));
+  } finally {
+    chat.close();
+  }
+  assert.equal(chats.chats().length, 0, "a closed terminal leaves the list");
 });
