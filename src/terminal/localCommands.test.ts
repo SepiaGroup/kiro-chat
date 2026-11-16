@@ -35,6 +35,7 @@ function setup(clientOk = true) {
     updatePrompt: () => void calls.push("updatePrompt"),
     restart: async () => void calls.push("restart"),
     clearScreen: () => void calls.push("cls"),
+    remoteAccess: async (a: string) => void calls.push(`remote ${a}`),
   } as unknown as LocalHost;
   return { cmds: new LocalCommands(host), printed, calls };
 }
@@ -74,6 +75,17 @@ test("simple commands go to the host; errors are printed, not thrown", async () 
   await s.cmds.run("set", "");
   assert.deepEqual(s.calls, ["cls", "restart"]);
   assert.match(s.printed.join("\n"), /The engine isn't running\. Type \/restart\.\nUsage: \/set <id> <value>/);
+});
+
+test("/remote starts, shows the link or stops; anything else prints the usage", async () => {
+  const s = setup();
+  await s.cmds.run("remote", "");
+  await s.cmds.run("remote", "LINK");
+  await s.cmds.run("remote", " stop ");
+  assert.deepEqual(s.calls, ["remote start", "remote link", "remote stop"]);
+  await s.cmds.run("remote", "on");
+  assert.equal(s.calls.length, 3);
+  assert.match(s.printed.at(-1) ?? "", /Usage: \/remote \[start \| link \| stop\]/);
 });
 
 test("/help lists commands, agent commands and keys", async () => {

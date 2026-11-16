@@ -133,6 +133,15 @@ export const COMMANDS: CommandSpec[] = [
   // Terminal
   { name: "restart", desc: "Restart the engine" },
   { name: "login", desc: "Log in to Kiro CLI" },
+  {
+    name: "remote",
+    desc: "Remote access from a phone or browser (Tailscale)",
+    subs: [
+      { name: "start", desc: "Turn remote access on and show the pairing card" },
+      { name: "link", desc: "Show a new pairing card" },
+      { name: "stop", desc: "Turn remote access off" },
+    ],
+  },
   { name: "cls", desc: "Clear the screen" },
   { name: "quit", desc: "Close this chat", aliases: ["exit", "q"] },
 
