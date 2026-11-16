@@ -31,8 +31,8 @@ export interface RemoteChat {
   readonly busy: boolean;
   /** The chat so far, as messages for a page that has none yet. */
   snapshot(): unknown[];
-  /** A message from a remote device that passed the policy. */
-  send(msg: RemoteMessage, device: { id: string; name: string }): Promise<void>;
+  /** A message from a remote device that passed the policy. `granted` is what the device may do (a chat checks the commands it runs against it). */
+  send(msg: RemoteMessage, device: { id: string; name: string }, granted: readonly Permission[]): Promise<void>;
   /** Live messages, in order. Returns the way to stop. */
   subscribe(listener: (msg: unknown) => void): () => void;
 }
@@ -697,7 +697,7 @@ export class RemoteServer {
           return this.fail(res, checked.status, checked.reason);
         }
         const device = { id: String(body.device?.id ?? "").slice(0, 40), name: cleanDeviceName(body.device?.name) || "Device" };
-        if (!(await this.handOver(() => chat.send(checked.msg, device), device.id))) {
+        if (!(await this.handOver(() => chat.send(checked.msg, device, granted), device.id))) {
           return this.fail(res, 500, "the chat could not take that");
         }
         res.writeHead(204);

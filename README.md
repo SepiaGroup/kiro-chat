@@ -92,7 +92,8 @@ Open Chat** opens the chat as an editor tab (set `kiroCliChat.openIn` to
   `/spawn`, `/cls` and `/quit` are for the terminal chat and say what to do
   instead. The agent's own commands (agents, skills, saved prompts) still go to
   the agent, and so does a line that starts with a space. Unknown commands
-  aren't sent. From a remote device every line goes to the agent as typed.
+  aren't sent. The same commands work from a remote device (see Remote
+  access).
 - **Renaming a chat.** `/title <name>`, **Rename Chat…** on the tab's
   right-click menu or **Kiro CLI Chat: Rename Chat…** renames the chat: its
   tab (or the panel view), the list on a remote
@@ -181,7 +182,8 @@ Then:
    for 10 minutes, and the page removes the secret from the address bar. The
    card closes when a device pairs.
 3. Pick a chat. You see the conversation as it is here, and can send prompts,
-   steer, stop a reply, answer questions and **Allow** or **Deny** a command once.
+   steer, stop a reply, answer questions, approve (with the same choices as
+   here, rules included) and run `/` commands.
    Both screens stay in step: answer an approval on one and it goes away on the
    other, with a line saying who answered.
 
@@ -202,8 +204,25 @@ access is off is not shown.
 A paired device stays paired until you remove it (**Remove Remote Device…**).
 Remote access is off by default and when VS Code closes (the extension takes its
 Tailscale share down; nothing else of yours in `tailscale serve` is touched).
-From a remote device you cannot create allow or deny rules, turn Autopilot on,
-restart the engine, log in or open tabs. The page fits a phone (light or dark
+A paired device is trusted like you at the keyboard: for a chat tab it can
+create allow or deny rules, switch Autopilot on, restart the engine, resume a
+session, open a tab and run `/` commands (`/usage`, `/context`, `/compact`,
+`/tools trust-all`, …; their output shows on the phone and in the tab). If a
+device is lost, remove it (**Remove Remote Device…**) or take it out of your
+tailnet. **If you paired a device before this version, it can now do all of
+this.** To keep a device to Allow once and Deny, take `approve` out of
+`kiroCliChat.remote.permissions`.
+
+What would act on the Mac itself is left out, and the command says so:
+logging in, `/remote`, `/copy`, `/settings`, `/theme`, `/transcript`,
+`/chat save`, `/agent create` and `/agent edit` (they open an editor, a
+terminal or a file there), and `/context add` and `/knowledge add|update`
+(they read a path on the Mac). `/set` changes only the Settings panel's
+options. Restart asks on the phone, not in a dialog on the Mac. Of the
+`kiroCliChat.remote.permissions`, `prompt` covers commands, Restart, Resume and
+new tabs, and `approve` covers the approval buttons and everything that
+changes approvals or Autopilot: the switch, `/autopilot`, `/tools trust-all`,
+`/tools reset` and `/set autopilot`. The page fits a phone (light or dark
 by the device's setting, large buttons, Enter adds a line and the Send button
 sends) and can be added to the home screen. The settings below are machine
 settings, so a workspace cannot turn remote access on.
@@ -212,7 +231,9 @@ settings, so a workspace cannot turn remote access on.
 way: the page shows the conversation, and a prompt, Stop, an approval or an
 answer from the phone acts in the terminal, which says so ("(from iPhone)",
 "Allowed from iPhone"). A prompt from the phone goes to the agent as typed: it
-never runs a terminal `/` command. While a command runs in the terminal
+never runs a terminal `/` command, and the phone offers only the agent's own
+commands there. Approvals from the phone are Allow or Deny only, and only
+Effort and Model can be changed. While a command runs in the terminal
 (`/compact`, `/resume`, …) the phone is asked to try again. The page shows the
 terminal's conversation since the terminal opened (or since `/clear`, `/new` or
 `/resume`); after `/rewind` it says the later messages are no longer part of it.

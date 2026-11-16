@@ -1,11 +1,14 @@
 // What a remote device may ask a chat to do, and in what shape. An allow-list:
 // anything not listed is refused, and only the listed fields get through.
-// Approving from a phone is running a command on the Mac, so a remote device
-// gets Allow once, Deny and Deny with a reason, and no way to create rules,
-// turn on Autopilot, restart the engine or open anything in VS Code.
-// (The chat also refuses answers that are not once-only; see ChatSession.)
+// A paired device is trusted as the owner (it can be unpaired, or removed from
+// the tailnet, when it is lost): it gets every approval choice including
+// rules, Autopilot and the other settings, Restart, Resume, a new tab and the
+// "/" commands (they arrive as prompts). Only what acts on the Mac's own
+// screen is left out: logging in, the remote access switch, anything that
+// opens a file or a dialog in VS Code.
 // Pure (no vscode import).
 
+import { isRuleKind } from "../approvalRules";
 import { MAX_ANSWER, MAX_IMAGES, MAX_STEER, cleanAnswer, cleanSteer, sanitizeImages } from "../webviewInput";
 
 export type Permission = "view" | "prompt" | "approve";
@@ -19,10 +22,13 @@ export type PolicyResult =
 
 /** Longest prompt accepted from a remote device. */
 export const MAX_REMOTE_PROMPT = 200_000;
-/** Settings a remote device may change. */
-export const REMOTE_CONFIG_IDS: readonly string[] = ["model", "effortLevel"];
+/** Settings a remote device may change (the ones in the Settings panel). */
+export const REMOTE_CONFIG_IDS: readonly string[] = ["model", "effortLevel", "autopilot", "memoryReflection", "contentCollection"];
+/** Of those, the ones that take away or change approvals: they need the approve permission. */
+const APPROVAL_CONFIG_IDS: readonly string[] = ["autopilot"];
 
 const MAX_ID = 200;
+const MAX_FOLDER = 4096;
 
 /** The permissions in a setting value: unknown entries dropped, all of them when it is not a list. */
 export function parsePermissions(raw: unknown): Permission[] {
@@ -121,7 +127,35 @@ export function checkRemoteMessage(raw: unknown, granted: readonly Permission[])
       if (!REMOTE_CONFIG_IDS.includes(id)) {
         return { ok: false, status: 403, reason: `this device may not change ${id}` };
       }
+      if (APPROVAL_CONFIG_IDS.includes(id)) {
+        const noApprove = need("approve");
+        if (noApprove) {
+          return noApprove;
+        }
+      }
       return pass({ type, id, value });
+    }
+
+    case "restart":
+    case "newTab":
+    case "resumeSession":
+      return need("prompt") ?? pass({ type });
+
+    case "loadSession": {
+      const denied = need("prompt");
+      if (denied) {
+        return denied;
+      }
+      const sessionId = str(m.sessionId, MAX_ID);
+      return sessionId ? pass({ type, sessionId }) : bad("no session");
+    }
+
+    case "confirmAnswer": {
+      const denied = need("prompt");
+      if (denied) {
+        return denied;
+      }
+      return typeof m.id === "number" && Number.isSafeInteger(m.id) ? pass({ type, id: m.id, yes: m.yes === true }) : bad("no question id");
     }
 
     case "approve": {
@@ -134,9 +168,14 @@ export function checkRemoteMessage(raw: unknown, granted: readonly Permission[])
       if (!toolCallId || !optionId) {
         return bad("no approval id");
       }
-      // `rule` and `folder` are dropped on purpose: no allow or deny rules from a remote device.
+      // Rules are allowed; the chat checks the rule kind and the folder, as for the desktop page.
       const reason = typeof m.reason === "string" ? m.reason.slice(0, 2000) : undefined;
-      return pass({ type, toolCallId, optionId, ...(reason ? { reason } : {}) });
+      if (m.rule !== undefined && !isRuleKind(m.rule)) {
+        return bad("unknown rule kind");
+      }
+      const rule = m.rule as string | undefined;
+      const folder = str(m.folder, MAX_FOLDER);
+      return pass({ type, toolCallId, optionId, ...(reason ? { reason } : {}), ...(rule ? { rule } : {}), ...(folder ? { folder } : {}) });
     }
 
     default:

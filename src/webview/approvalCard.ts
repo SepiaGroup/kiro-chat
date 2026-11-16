@@ -90,8 +90,8 @@ export function renderApproval(req: ApprovalRequest): void {
     const deny = opt("reject_once");
     const allowRule = opt("allow_always");
     const denyRule = opt("reject_always");
-    // A remote device can only allow or deny once (the server refuses rules), so it is not offered them.
-    const rulesOffered = !document.body.classList.contains("remote-page");
+    // A terminal chat takes only Allow and Deny from a remote device, so its page is not offered rules.
+    const rulesOffered = !document.body.classList.contains("remote-page") || document.body.classList.contains("slash-chat");
     // Allow choices first, then deny choices.
     if (allow) {
       row.appendChild(button(allow.name || "Allow", "allow", () => send({ optionId: allow.optionId })));

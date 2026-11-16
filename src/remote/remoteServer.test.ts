@@ -309,10 +309,10 @@ test("chat list, and messages go through the policy to the chat with the device 
     assert.equal(typeof rig.chats[0].sent[0].device.id, "string");
     assert.equal(rig.chats[0].sent[0].device.name, "iPhone, Safari");
 
-    const refused = await request(rig.port, "POST", "/api/chats/c1/message", { headers: h, json: { type: "restart" } });
+    const refused = await request(rig.port, "POST", "/api/chats/c1/message", { headers: h, json: { type: "login" } });
     assert.equal(refused.status, 403);
-    assert.ok(rig.log.some((l) => l.includes("refused restart")));
-    const autopilot = await request(rig.port, "POST", "/api/chats/c1/message", { headers: h, json: { type: "setConfig", id: "autopilot", value: "on" } });
+    assert.ok(rig.log.some((l) => l.includes("refused login")));
+    const autopilot = await request(rig.port, "POST", "/api/chats/c1/message", { headers: h, json: { type: "setConfig", id: "other", value: "on" } });
     assert.equal(autopilot.status, 403);
     assert.equal(rig.chats[0].sent.length, 1);
 
