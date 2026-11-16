@@ -14,6 +14,27 @@ export type RuleKind = "exact" | "pattern" | "folder" | "tool";
 export const isRuleKind = (v: unknown): v is RuleKind =>
   v === "exact" || v === "pattern" || v === "folder" || v === "tool";
 
+/**
+ * The answer to an approval from a message a page or a remote device sent:
+ * only the fields that have the right type are taken (the policy has already
+ * bounded their length for a remote device). Whether the option can use them
+ * is the engine layer's call: `reason` counts for a deny once, `rule` and
+ * `folder` for an allow or deny always, and it ignores them otherwise.
+ */
+export function approvalAnswerFromMessage(msg: Readonly<Record<string, unknown>>): {
+  optionId: string;
+  rule?: RuleKind;
+  folder?: string;
+  reason?: string;
+} {
+  return {
+    optionId: String(msg.optionId ?? ""),
+    ...(isRuleKind(msg.rule) ? { rule: msg.rule } : {}),
+    ...(typeof msg.folder === "string" ? { folder: msg.folder } : {}),
+    ...(typeof msg.reason === "string" ? { reason: msg.reason } : {}),
+  };
+}
+
 export interface FolderOffer {
   /** Suggested folder: the parent of the file being changed. */
   prefill: string;

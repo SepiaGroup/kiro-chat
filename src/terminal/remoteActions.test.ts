@@ -15,12 +15,13 @@ function rig(over: { canAct?: boolean; engine?: boolean } = {}) {
       return state.turnRunning;
     },
     steer: async (t) => void calls.push(["steer", t]),
-    respondToApproval: (id, a, o) => {
-      calls.push(["approve", id, a, o]);
-      if (a.optionId === "rule") {
-        throw new Error("A remote device can only allow or deny once.");
+    respondToApproval: (id, a) => {
+      calls.push(["approve", id, a]);
+      if (a.folder === "/outside") {
+        throw new Error("The folder must be inside the workspace.");
       }
-      return a.optionId === "a1" ? "allow_once" : "reject_once";
+      const kinds: Record<string, string> = { a1: "allow_once", ar: "allow_always", dr: "reject_always" };
+      return kinds[a.optionId] ?? "reject_once";
     },
     answerQuestion: (id, a) => void calls.push(["answer", id, a]),
     setMode: async (m) => void calls.push(["mode", m]),
@@ -65,17 +66,35 @@ test("an idle prompt runs as a turn; a busy terminal says so; a running turn is 
   assert.match(String(r.posted.at(-1)?.text), /Images can't be added/);
 });
 
-test("approvals from a device are once only, labelled, and leave the terminal waiting on a refusal", async () => {
+test("an approval from a device can be any choice: allow, deny with a reason, a rule, a folder", async () => {
   const r = rig();
+  const answer = (msg: Record<string, unknown>) => r.actions.handle({ type: "approve", toolCallId: "tc1", ...msg } as never, "iPhone");
   r.actions.track(approval("tc1", 7));
-  await r.actions.handle({ type: "approve", toolCallId: "tc1", optionId: "rule" }, "iPhone");
+  // An invalid folder is refused and the terminal keeps waiting.
+  await answer({ optionId: "ar", rule: "folder", folder: "/outside" });
   assert.deepEqual(r.shown, []);
   assert.equal(r.posted.at(-1)?.type, "notice");
-  await r.actions.handle({ type: "approve", toolCallId: "tc1", optionId: "a1" }, "iPhone");
-  assert.deepEqual(r.calls.at(-1), ["approve", 7, { optionId: "a1" }, { onceOnly: true }]);
+  assert.equal(r.posted.at(-1)?.isError, true);
+  await answer({ optionId: "ar", rule: "folder", folder: "/work/src" });
+  assert.deepEqual(r.calls.at(-1), ["approve", 7, { optionId: "ar", rule: "folder", folder: "/work/src" }]);
   assert.deepEqual(r.shown, [["approval", "Allowed from iPhone"]]);
-  await r.actions.handle({ type: "approve", toolCallId: "tc1", optionId: "a1" }, "iPhone");
+  await answer({ optionId: "a1" });
   assert.equal(r.shown.length, 1, "answered once");
+  r.actions.track(approval("tc2", 8));
+  await r.actions.handle({ type: "approve", toolCallId: "tc2", optionId: "dr", rule: "tool" }, "iPhone");
+  assert.deepEqual(r.calls.at(-1), ["approve", 8, { optionId: "dr", rule: "tool" }]);
+  assert.deepEqual(r.shown.at(-1), ["approval", "Denied from iPhone"]);
+  r.actions.track(approval("tc3", 9));
+  await r.actions.handle({ type: "approve", toolCallId: "tc3", optionId: "d1", reason: "not now" }, "iPhone");
+  assert.deepEqual(r.calls.at(-1), ["approve", 9, { optionId: "d1", reason: "not now" }]);
+  // An unknown rule kind is not passed on.
+  r.actions.track(approval("tc4", 10));
+  await r.actions.handle({ type: "approve", toolCallId: "tc4", optionId: "ar", rule: "everything" } as never, "iPhone");
+  assert.deepEqual(r.calls.at(-1), ["approve", 10, { optionId: "ar" }]);
+  // A folder or reason that is not text is not passed on either.
+  r.actions.track(approval("tc5", 11));
+  await r.actions.handle({ type: "approve", toolCallId: "tc5", optionId: "ar", rule: "folder", folder: 5, reason: { x: 1 } } as never, "iPhone");
+  assert.deepEqual(r.calls.at(-1), ["approve", 11, { optionId: "ar", rule: "folder" }]);
 });
 
 test("an approval answered in the terminal reaches the device; the turn's end drops the rest", () => {
@@ -132,7 +151,7 @@ test("without an engine a prompt and the context card say so", async () => {
   assert.deepEqual(r.posted.map((m) => m.type), ["error", "contextBreakdown"]);
 });
 
-test("a terminal chat ignores what only a chat tab takes, and drops a rule from an approval", async () => {
+test("a terminal chat ignores what only a chat tab takes", async () => {
   const r = rig();
   // The policy lets these through for every chat; the terminal does none of them.
   for (const msg of [
@@ -149,8 +168,4 @@ test("a terminal chat ignores what only a chat tab takes, and drops a rule from 
   assert.deepEqual(r.calls, []);
   assert.deepEqual(r.printed, []);
   assert.deepEqual(r.shown, []);
-  // A rule on an Allow-once answer is not passed on; a rule option is refused (onceOnly).
-  r.actions.track(approval("tc1", 7));
-  await r.actions.handle({ type: "approve", toolCallId: "tc1", optionId: "a1", rule: "tool", folder: "/tmp" }, "iPhone");
-  assert.deepEqual(r.calls.at(-1), ["approve", 7, { optionId: "a1" }, { onceOnly: true }]);
 });

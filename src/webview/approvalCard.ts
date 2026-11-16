@@ -90,13 +90,11 @@ export function renderApproval(req: ApprovalRequest): void {
     const deny = opt("reject_once");
     const allowRule = opt("allow_always");
     const denyRule = opt("reject_always");
-    // A terminal chat takes only Allow and Deny from a remote device, so its page is not offered rules.
-    const rulesOffered = !document.body.classList.contains("remote-page") || document.body.classList.contains("slash-chat");
     // Allow choices first, then deny choices.
     if (allow) {
       row.appendChild(button(allow.name || "Allow", "allow", () => send({ optionId: allow.optionId })));
     }
-    if (allowRule && rulesOffered) {
+    if (allowRule) {
       row.appendChild(
         button(allowRule.name, "allow", () =>
           req.allowRules?.length ? rulePage("allow", allowRule, req.allowRules) : send({ optionId: allowRule.optionId })
@@ -107,7 +105,7 @@ export function renderApproval(req: ApprovalRequest): void {
       row.appendChild(button(deny.name || "Deny", "deny", () => send({ optionId: deny.optionId })));
       row.appendChild(button("Deny with reason…", "deny", () => reasonPage(deny)));
     }
-    if (denyRule && rulesOffered) {
+    if (denyRule) {
       row.appendChild(
         button(denyRule.name, "deny", () =>
           req.denyRules?.length ? rulePage("deny", denyRule, req.denyRules) : send({ optionId: denyRule.optionId })

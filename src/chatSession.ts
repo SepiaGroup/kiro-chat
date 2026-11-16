@@ -16,7 +16,7 @@ import { randomUUID } from "crypto";
 import { resolveCliPath } from "./cli";
 import { imageMimeForPath, sniffImageMime } from "./terminal/imagePaths";
 import { resetPreparedEngine } from "./enginePrep";
-import { isRuleKind } from "./approvalRules";
+import { approvalAnswerFromMessage } from "./approvalRules";
 import { ApprovalAnswer, ChatEvent, EngineVersion, PromptImage, RpcId } from "./types";
 import { ChatTranscript } from "./chatTranscript";
 import { ansiSegments } from "./ansiSegments";
@@ -467,12 +467,7 @@ export class ChatSession implements RemoteChat {
       case "approve":
         this.handleApproval(
           String(msg.toolCallId ?? ""),
-          {
-            optionId: String(msg.optionId ?? ""),
-            ...(isRuleKind(msg.rule) ? { rule: msg.rule } : {}),
-            ...(typeof msg.folder === "string" ? { folder: msg.folder } : {}),
-            ...(typeof msg.reason === "string" ? { reason: msg.reason } : {}),
-          },
+          approvalAnswerFromMessage(msg),
           origin
         );
         break;

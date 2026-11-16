@@ -2,6 +2,7 @@
 // approvals and questions are waiting for an answer from one. Pure: the
 // terminal is behind `RemoteActionsHost`.
 
+import { approvalAnswerFromMessage } from "../approvalRules";
 import { errorMessage } from "../format";
 import type { RemoteMessage } from "../remote/remotePolicy";
 import type { ApprovalAnswer, ChatEvent, PromptImage, RpcId } from "../types";
@@ -12,7 +13,7 @@ import { sanitize, style } from "./ansi";
 export interface RemoteEngine {
   readonly turnRunning: boolean;
   steer(text: string): Promise<unknown>;
-  respondToApproval(requestId: RpcId, answer: ApprovalAnswer, opts: { onceOnly: true }): string;
+  respondToApproval(requestId: RpcId, answer: ApprovalAnswer): string;
   answerQuestion(requestId: RpcId, answer?: string): void;
   setMode(modeId: string): Promise<void>;
   setConfigOption(id: string, value: string): Promise<unknown>;
@@ -177,12 +178,15 @@ export class RemoteActions {
         if (!engine || requestId === undefined) {
           return;
         }
-        const answer: ApprovalAnswer = { optionId: String(msg.optionId ?? ""), ...(typeof msg.reason === "string" ? { reason: msg.reason } : {}) };
+        // Any choice the terminal offers: allow, deny, a reason, a rule (with a folder).
+        // The lengths of `reason` and `folder` are bounded by `remotePolicy.ts`
+        // before a message gets here; a caller that skips the policy must bound them.
+        const answer: ApprovalAnswer = approvalAnswerFromMessage(msg);
         let kind: string;
         try {
-          kind = engine.respondToApproval(requestId, answer, { onceOnly: true });
+          kind = engine.respondToApproval(requestId, answer);
         } catch (err) {
-          host.post({ type: "notice", text: errorMessage(err) }); // still waiting
+          host.post({ type: "notice", text: errorMessage(err), isError: true }); // an invalid folder: still waiting
           return;
         }
         const event = this.approvalDone(requestId, kind.startsWith("allow"), `from ${device}`);
