@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fragmentSecret, GATE_TEXT, parseChatList, pickChat } from "./remoteBoot";
+import { chatLabel, fragmentSecret, GATE_TEXT, parseChatList, pickChat } from "./remoteBoot";
 
 test("the pairing secret is read from the fragment, and only a well-formed one", () => {
   const secret = "A".repeat(43);
@@ -28,9 +28,25 @@ test("the chat list drops malformed entries and long titles", () => {
   assert.deepEqual(parseChatList("nope"), []);
 });
 
+test("the window is part of the list, and of the button text only when there is more than one", () => {
+  const list = parseChatList([
+    { id: "a", title: "Main", busy: false, window: "KiroRepo" },
+    { id: "b", title: "Build", busy: true, window: "Other".repeat(40) },
+    { id: "c", title: "Old server", busy: false },
+  ]);
+  assert.equal(list[0].window, "KiroRepo");
+  assert.equal(list[1].window.length, 80);
+  assert.equal(list[2].window, "");
+  assert.equal(chatLabel(list[0], list), "KiroRepo: Main");
+  assert.match(chatLabel(list[1], list), /^OtherOther.*: Build \(working\)$/);
+  assert.equal(chatLabel(list[2], list), "Old server");
+  const one = [list[0], { ...list[2], window: "KiroRepo" }];
+  assert.equal(chatLabel(one[0], one), "Main");
+});
+
 test("the last chat is reopened, or the only one; otherwise the user chooses", () => {
-  const a = { id: "a", title: "A", busy: false };
-  const b = { id: "b", title: "B", busy: false };
+  const a = { id: "a", title: "A", busy: false, window: "" };
+  const b = { id: "b", title: "B", busy: false, window: "" };
   assert.equal(pickChat([a, b], "b"), "b");
   assert.equal(pickChat([a, b], "gone"), undefined);
   assert.equal(pickChat([a, b], null), undefined);

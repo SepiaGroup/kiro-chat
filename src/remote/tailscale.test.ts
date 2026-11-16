@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { baseUrl, existingServe, findCli, interpretServe, parseStatus, RunResult, Run, serveArgs, TailscaleServe, unserveArgs } from "./tailscale";
+import { baseUrl, existingProxyPort, existingServe, findCli, interpretServe, parseStatus, RunResult, Run, serveArgs, TailscaleServe, unserveArgs } from "./tailscale";
 
 const ok = (stdout = ""): RunResult => ({ code: 0, stdout, stderr: "", timedOut: false });
 const status = (state: string, extra: Record<string, unknown> = {}) =>
@@ -119,4 +119,28 @@ test("remove takes down only what expose set up, once", async () => {
   await t.remove();
   assert.equal(f.calls.filter((c) => c.endsWith("serve --https=10000 off")).length, 1);
   assert.equal(t.active, false);
+});
+
+test("a proxy to another local port that still answers is not taken over; a dead one is", async () => {
+  const mine = JSON.stringify({ Web: { "michaels-mac-pro.taila1bfeb.ts.net:8443": { Handlers: { "/": { Proxy: "http://127.0.0.1:40000" } } } } });
+  assert.equal(existingProxyPort(mine, "michaels-mac-pro.taila1bfeb.ts.net", 8443), 40000);
+  assert.equal(existingProxyPort(mine, "michaels-mac-pro.taila1bfeb.ts.net", 443), undefined);
+  assert.equal(existingProxyPort("garbage", "x", 8443), undefined);
+  const handlers = { status: () => ok(status("Running")), "serve status": () => ok(mine), serve: () => ok("Available") };
+
+  const probed: number[] = [];
+  const live = fake(handlers);
+  const refused = await new TailscaleServe(live.run, undefined, async (p) => (probed.push(p), true)).expose(50000);
+  assert.equal(refused.ok, false);
+  assert.match((refused as { advice: string }).advice, /already shared .*local port 40000/);
+  assert.deepEqual(probed, [40000]);
+  assert.ok(!live.calls.some((c) => c.includes("--bg")), "nothing was changed");
+
+  const dead = fake(handlers);
+  assert.equal((await new TailscaleServe(dead.run, undefined, async () => false).expose(50000)).ok, true);
+  assert.ok(dead.calls.some((c) => c.includes("--bg --https=8443 http://127.0.0.1:50000")));
+
+  // Our own port again (a restart on the same port) is just ours.
+  const same = fake(handlers);
+  assert.equal((await new TailscaleServe(same.run, undefined, async () => true).expose(40000)).ok, true);
 });
