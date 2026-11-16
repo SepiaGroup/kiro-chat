@@ -119,6 +119,10 @@ module.
    back and the session reopens it. If the load fails, it starts a new session.
 6. If the panel view is moved and VS Code rebuilds its webview, the same
    `ChatSession` replays its transcript into the new webview (`resyncWebview`).
+   The transcript lives in memory only, at most 20,000 messages and about 32 MB
+   of text per chat (`chatTranscript.ts`). Over that, pasted images in the
+   oldest messages are dropped first (a notice says so), then the oldest
+   messages. Remote devices get the same transcript as their snapshot.
 7. Closing a tab disposes its session and kills its engine. The conversation
    stays on disk and appears under Resume.
 

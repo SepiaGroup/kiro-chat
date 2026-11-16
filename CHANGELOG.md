@@ -4,6 +4,8 @@
 
 First release.
 
+- `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
+- A chat's history in memory is limited to about 32 MB: images in the oldest messages go first.
 - Chat with the Kiro CLI v3 engine in editor tabs, the panel, or a text-mode
   terminal chat, on Macs without AVX/AVX2.
 - Approvals like kiro-cli: Allow, Create allow rule… (exact, command pattern,
