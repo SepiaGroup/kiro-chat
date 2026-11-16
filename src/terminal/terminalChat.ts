@@ -114,6 +114,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
       newConversation: (clear) => this.newConversation(clear),
       restart: () => this.restart(),
       login: () => this.login(),
+      remoteAccess: (action) => this.remoteAccess(action),
       clearScreen: () => this.clearScreen(),
       exit: () => this.exit(),
     });
@@ -721,6 +722,15 @@ export class TerminalChat implements vscode.Pseudoterminal {
     t.show();
     t.sendText("kiro-cli login");
     this.print(style.gray("Finish logging in in the “Kiro CLI Login” terminal, then come back and type /restart."));
+  }
+
+  private async remoteAccess(action: "start" | "link" | "stop"): Promise<void> {
+    const id = { start: "startRemoteAccess", link: "showRemoteLink", stop: "stopRemoteAccess" }[action];
+    // The link is a secret, so it is shown on a card in the editor, not printed into the terminal's scrollback.
+    await vscode.commands.executeCommand(`kiroCliChat.${id}`);
+    this.print(
+      style.gray(action === "stop" ? "Remote access is off." : "The pairing card is open in the editor. Scan the code or copy the link there.")
+    );
   }
 
   private clearScreen(): void {

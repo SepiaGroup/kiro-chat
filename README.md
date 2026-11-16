@@ -117,7 +117,7 @@ Commands follow kiro-cli: `/help`, `/clear`, `/new`, `/chat new|save|load`,
 `/reply`, `/paste`, `/spawn`, `/context`, `/knowledge`, `/model`, `/effort`,
 `/agent` (incl. `create`/`edit`), `/plan`, `/prompts`, `/tools`, `/autopilot`,
 `/mcp`, `/hooks`, `/code`, `/config`, `/set`, `/usage`, `/stats`,
-`/changelog`, `/settings`, `/theme`, `/restart`, `/login`, `/cls`, `/quit`.
+`/changelog`, `/settings`, `/theme`, `/restart`, `/login`, `/remote`, `/cls`, `/quit`.
 
 - `/guide`, `/goal` and `/voice` aren't available (the engine or this machine
   can't support them) and say so.
@@ -150,8 +150,9 @@ One-time setup:
 
 Then:
 
-1. Tick **Remote access** in ⚙ Settings, or run **Kiro CLI Chat: Start Remote
-   Access**. A **Remote** item appears in the status bar.
+1. Tick **Remote access** in ⚙ Settings, run **Kiro CLI Chat: Start Remote
+   Access**, or type `/remote` in a terminal chat (`/remote link` for a new
+   pairing card, `/remote stop` to turn it off). A **Remote** item appears in the status bar.
 2. A card opens with a QR code. Scan it with the phone's camera, or choose
    **Copy Link** (and send it, for example with AirDrop or Messages) or **Open
    in Browser**. **New Link** makes a fresh code. The pairing link works once,

@@ -23,6 +23,8 @@ export interface LocalHost extends ChatHost {
   newConversation(clearScreen: boolean): Promise<void>;
   restart(): Promise<void>;
   login(): void;
+  /** Start or stop remote access, or show its pairing card (VS Code's own commands). */
+  remoteAccess(action: "start" | "link" | "stop"): Promise<void>;
   clearScreen(): void;
   exit(): void;
 }
@@ -153,6 +155,15 @@ export class LocalCommands {
         case "login":
           this.host.login();
           break;
+        case "remote": {
+          const action = arg.trim().toLowerCase() || "start";
+          if (action === "start" || action === "link" || action === "stop") {
+            await this.host.remoteAccess(action);
+          } else {
+            this.host.print(style.gray("Usage: /remote [start | link | stop]"));
+          }
+          break;
+        }
         case "cls":
           this.host.clearScreen();
           break;
