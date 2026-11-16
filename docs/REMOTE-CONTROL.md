@@ -2,6 +2,10 @@
 
 Status: implemented in steps (see the PR list below). Transport: Tailscale.
 
+This is the original plan. Where it differs from what was built (terminal
+chats, approval rules, commands and Restart from a device), `ARCHITECTURE.md`
+and the README are right.
+
 ## Goal
 
 A chat keeps running on the desktop (VS Code and the Kiro engine on the Mac).
@@ -136,11 +140,15 @@ leaks, the damage is the same as someone sitting at the Mac, so:
   else is rejected and logged):
   - `ready`, `sendPrompt`, `steerPrompt`, `cancelTurn`, `answerQuestion`,
     `getContextBreakdown`, `compact`, `setMode`.
-  - `approve` with Allow once, Deny, or Deny with a reason. The `rule` and
-    `folder` fields are dropped, so no allow rules are created from a phone.
-  - `setConfig` for model and effort only. Never Autopilot (`setAutoApprove`).
-  - Never: `login`, `newTab`, `restart`, `newSession`, `resumeSession`,
-    `loadSession`, `pickAttachment`, `attachPaths`, `debugLog`.
+  - `approve` with any option: Allow, Deny, Deny with a reason, and allow or
+    deny rules with a folder (a rule kind is checked, lengths are bounded).
+    Changed after the first version, which dropped `rule` and `folder`.
+  - `setConfig` for model, effort, Autopilot, memory reflection and content
+    collection (Autopilot needs `approve`; a terminal chat takes model and
+    effort only). `restart`, `newTab`, `resumeSession`, `loadSession` and
+    `confirmAnswer` for chat tabs, and "/" commands through an allow-list.
+  - Never: `login`, `newSession`, `pickAttachment`, `attachPaths`, `debugLog`,
+    `setAutoApprove`, `remoteAccess`, `remoteLink`.
 - A setting, `kiroCliChat.remote.permissions` (`view`, `prompt`, `approve`),
   limits a device further. Default: all three, because approving is the point.
 - Text from the phone is untrusted like text from the webview: it goes through
@@ -257,7 +265,8 @@ PRs 1 and 2 are the bulk of the risk and are fully testable without a phone.
 1. A paired phone stays paired until removed (proposed), instead of pairing
    again each time remote access starts.
 2. Approvals from the phone are allowed by default once remote access is on.
-3. Only Allow once, Deny and Deny with a reason from the phone; no allow
-   rules, no Autopilot toggle.
+3. (Changed.) A paired device is trusted like the owner: every approval
+   choice, rules and Autopilot included. `approve` in the permissions is the
+   switch for all of it.
 4. Mirror chats open on the desktop only; starting chats from the phone comes
    later.

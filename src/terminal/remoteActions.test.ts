@@ -20,7 +20,8 @@ function rig(over: { canAct?: boolean; engine?: boolean } = {}) {
       if (a.folder === "/outside") {
         throw new Error("The folder must be inside the workspace.");
       }
-      return a.optionId === "a1" ? "allow_once" : a.optionId === "ar" ? "allow_always" : a.optionId === "dr" ? "reject_always" : "reject_once";
+      const kinds: Record<string, string> = { a1: "allow_once", ar: "allow_always", dr: "reject_always" };
+      return kinds[a.optionId] ?? "reject_once";
     },
     answerQuestion: (id, a) => void calls.push(["answer", id, a]),
     setMode: async (m) => void calls.push(["mode", m]),
@@ -90,6 +91,10 @@ test("an approval from a device can be any choice: allow, deny with a reason, a 
   r.actions.track(approval("tc4", 10));
   await r.actions.handle({ type: "approve", toolCallId: "tc4", optionId: "ar", rule: "everything" } as never, "iPhone");
   assert.deepEqual(r.calls.at(-1), ["approve", 10, { optionId: "ar" }]);
+  // A folder or reason that is not text is not passed on either.
+  r.actions.track(approval("tc5", 11));
+  await r.actions.handle({ type: "approve", toolCallId: "tc5", optionId: "ar", rule: "folder", folder: 5, reason: { x: 1 } } as never, "iPhone");
+  assert.deepEqual(r.calls.at(-1), ["approve", 11, { optionId: "ar", rule: "folder" }]);
 });
 
 test("an approval answered in the terminal reaches the device; the turn's end drops the rest", () => {

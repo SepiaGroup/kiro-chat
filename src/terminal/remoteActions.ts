@@ -2,7 +2,7 @@
 // approvals and questions are waiting for an answer from one. Pure: the
 // terminal is behind `RemoteActionsHost`.
 
-import { isRuleKind } from "../approvalRules";
+import { approvalAnswerFromMessage } from "../approvalRules";
 import { errorMessage } from "../format";
 import type { RemoteMessage } from "../remote/remotePolicy";
 import type { ApprovalAnswer, ChatEvent, PromptImage, RpcId } from "../types";
@@ -179,12 +179,9 @@ export class RemoteActions {
           return;
         }
         // Any choice the terminal offers: allow, deny, a reason, a rule (with a folder).
-        const answer: ApprovalAnswer = {
-          optionId: String(msg.optionId ?? ""),
-          ...(isRuleKind(msg.rule) ? { rule: msg.rule } : {}),
-          ...(typeof msg.folder === "string" ? { folder: msg.folder } : {}),
-          ...(typeof msg.reason === "string" ? { reason: msg.reason } : {}),
-        };
+        // The lengths of `reason` and `folder` are bounded by `remotePolicy.ts`
+        // before a message gets here; a caller that skips the policy must bound them.
+        const answer: ApprovalAnswer = approvalAnswerFromMessage(msg);
         let kind: string;
         try {
           kind = engine.respondToApproval(requestId, answer);

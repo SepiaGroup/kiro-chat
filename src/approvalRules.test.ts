@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkFolder, folderOffer, folderResource, normalizePath, shellPattern, truncate } from "./approvalRules";
+import { approvalAnswerFromMessage, checkFolder, folderOffer, folderResource, normalizePath, shellPattern, truncate } from "./approvalRules";
 
 test("shellPattern", () => {
   assert.equal(shellPattern("cat src/a.ts"), "cat *");
@@ -62,4 +62,13 @@ test("folderResource and truncate", () => {
   assert.equal(folderResource("/"), "/**");
   assert.equal(truncate("x".repeat(60)), "x".repeat(47) + "…");
   assert.equal(truncate("short"), "short");
+});
+
+test("approvalAnswerFromMessage takes only fields of the right type", () => {
+  assert.deepEqual(approvalAnswerFromMessage({ optionId: "o", rule: "folder", folder: "/a", reason: "no" }), { optionId: "o", rule: "folder", folder: "/a", reason: "no" });
+  assert.deepEqual(approvalAnswerFromMessage({ optionId: "o" }), { optionId: "o" });
+  assert.deepEqual(approvalAnswerFromMessage({}), { optionId: "" });
+  assert.deepEqual(approvalAnswerFromMessage({ optionId: "o", rule: "everything", folder: 5, reason: { a: 1 } }), { optionId: "o" });
+  assert.deepEqual(approvalAnswerFromMessage({ optionId: "o", rule: ["tool"], folder: null, reason: false }), { optionId: "o" });
+  assert.deepEqual(approvalAnswerFromMessage({ optionId: 7 }), { optionId: "7" });
 });
