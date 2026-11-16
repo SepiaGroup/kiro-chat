@@ -97,7 +97,7 @@ Then run **Developer: Reload Window**.
 Needs two VS Code windows on different folders, each with a chat tab, and a paired phone (see below).
 
 - [ ] Start remote access in window A. Then start it in window B (Remote item in the status bar shows "Remote (shared)" in B). No second Tailscale prompt, and A's phone page keeps working (the earlier bug: B used to take the address from A).
-- [ ] On the phone, tap **Chats** (left of the toolbar): the list shows "A: ...", "B: ..." chats. Open B's chat, send a prompt: it appears in window B. Switch back with Chats.
+- [ ] On the phone, open the chat dropdown (left of the toolbar, it names the chat you are on): the list shows "A: ...", "B: ..." chats. Open B's chat, send a prompt: it appears in window B. Switch back with the dropdown.
 - [ ] In B, **Show Remote Access Link** shows a card with a QR code (it asks the other window). **Remove Remote Device…** in B lists the paired devices.
 - [ ] Close window A (the one that started first). Within a few seconds the phone shows the reconnect bar, then B's chats; B's status bar says "Remote" (it is the hub now). No new pairing is needed.
 - [ ] Reopen window A, start remote access: it joins as a member, and its chats show up on the phone.

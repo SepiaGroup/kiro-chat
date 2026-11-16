@@ -46,7 +46,7 @@ export function pickChat(chats: readonly ChatInfo[], saved: string | null | unde
   return chats.length === 1 ? chats[0].id : undefined;
 }
 
-export type GateKind = "badLink" | "unpaired" | "noChats" | "pick" | "switch" | "gone" | "removed" | "denied" | "offline";
+export type GateKind = "badLink" | "unpaired" | "noChats" | "pick" | "gone" | "removed" | "denied" | "offline";
 
 /** What the start-up screen says. Short sentences that say what to do next. */
 export const GATE_TEXT: Record<GateKind, string> = {
@@ -54,7 +54,6 @@ export const GATE_TEXT: Record<GateKind, string> = {
   unpaired: "This device is not paired. In VS Code run \"Kiro CLI Chat: Show Remote Access Link\" and open that link here.",
   noChats: "No chat is open in VS Code. Open one there, then reload this page.",
   pick: "Choose a chat",
-  switch: "Switch chat",
   gone: "That chat was closed in VS Code. Choose another.",
   removed: "This device was removed in VS Code. Run \"Kiro CLI Chat: Show Remote Access Link\" to pair it again.",
   denied: "This device may not view chats. Change kiroCliChat.remote.permissions in VS Code.",

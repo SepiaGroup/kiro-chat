@@ -14,7 +14,7 @@ First release.
 - Remote access (preview): watch and use a chat tab from your phone or another
   browser over Tailscale (HTTPS, your tailnet only), paired once with a link
   or a QR code on a card in VS Code. Several VS Code windows share one address
-  and one chat list, with a Chats button on the page to switch. Approvals can be allowed or
+  and one chat list, with a dropdown on the page that names the chat and switches it. Approvals can be allowed or
   denied once from the other screen; no rules, Autopilot or restart.
   The page fits a phone: it follows the device's light or dark setting, has
   large touch targets, system fonts, handles the keyboard and the notch, and can be added to

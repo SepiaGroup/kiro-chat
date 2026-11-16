@@ -169,8 +169,8 @@ is missing or not ready, remote access still starts for this Mac only
 
 **Several VS Code windows.** Turn remote access on in each window you want on
 the phone. They share one address, one pairing and one list: the page shows the
-chats of every window ("MyRepo: Chat 1"), and the **Chats** button at the left
-of the toolbar switches between them. One window (the first) holds the address;
+chats of every window ("MyRepo: Chat 1"), and the dropdown at the left of the
+toolbar shows which chat you are on and switches between them. One window (the first) holds the address;
 if it closes or you stop remote access in it, another window takes over within a
 few seconds and the page reconnects by itself. **Show Remote Access Link** and
 **Remove Remote Device…** work from any of the windows. A window where remote
