@@ -29,7 +29,7 @@ import { describeError } from "./errorAdvice";
 import { errorMessage } from "./format";
 import { pickSessions } from "./sessionList";
 import type { RemoteChat } from "./remote/remoteServer";
-import type { RemoteMessage } from "./remote/remotePolicy";
+import type { Permission, RemoteMessage } from "./remote/remotePolicy";
 import { deliver, UiTarget, UiTargets } from "./uiTargets";
 import { webviewHtml } from "./webviewHtml";
 import { cleanAnswer, cleanSteer, MAX_IMAGE_BYTES, MAX_IMAGES, sanitizeImages } from "./webviewInput";
@@ -61,7 +61,7 @@ export interface RemoteAccessControl {
 }
 
 /** Where a message from a screen came from. Remote ones are checked before they get here; `device` is its name. */
-export type MessageOrigin = { kind: "desktop" } | { kind: "remote"; device: string };
+export type MessageOrigin = { kind: "desktop" } | { kind: "remote"; device: string; /** What the device may do (the commands it runs are checked against it). */ granted?: readonly Permission[] };
 
 /** A screen that only exists to be a source in `onMessage` (remote messages have no page to answer). */
 const NO_PAGE: UiTarget = { postMessage: () => undefined };
@@ -105,7 +105,7 @@ export class ChatSession implements RemoteChat {
     updatePrompt: () => undefined,
     resetConversationState: () => this.conv.reset(),
     newConversation: () => this.newSession(),
-    restart: () => (this.commandOrigin.kind === "remote" ? this.confirmRestartOnPage(this.commandOrigin.device) : this.confirmRestart()),
+    restart: () => this.confirmRestart(), // a remote device's /restart is handled in runSlash
     login: () => this.runLogin(),
     remoteAccess: async (action) => {
       // Not run for a remote device (routeSlash tells it so); this is the Mac's own.
@@ -119,8 +119,9 @@ export class ChatSession implements RemoteChat {
   /** The command whose card output goes to; a command runs one at a time. */
   private commandRun = 0;
   private commandBusy = false;
-  /** Who typed the command that is running (a restart asks them, not the Mac). */
-  private commandOrigin: MessageOrigin = { kind: "desktop" };
+  private confirmSeq = 0;
+  /** How long a Yes/No question waits for an answer (then it counts as No). */
+  private confirmTimeoutMs = 5 * 60_000;
   /** y/n questions a command asked (`/knowledge clear`, an existing file in `/chat save`). */
   private readonly confirms = new Map<number, (yes: boolean) => void>();
   private cancelRequested = false;
@@ -256,8 +257,7 @@ export class ChatSession implements RemoteChat {
       return;
     }
     const run = ++this.commandRun;
-    this.commandOrigin = origin;
-    this.commandPost({ type: "commandStart", run, text: route.text + (origin.kind === "remote" ? `  (from ${origin.device})` : "") });
+    this.showOnScreens({ type: "commandStart", run, text: route.text + (origin.kind === "remote" ? `  (from ${origin.device})` : "") });
     if (route.kind === "unknown") {
       this.commandPrint(style.yellow(`Unknown command /${route.name}.`) + style.gray(" Type /help to see commands (start with a space to send it to the agent as text)."));
       return;
@@ -282,8 +282,17 @@ export class ChatSession implements RemoteChat {
       this.commandPrint(style.gray(origin.kind === "desktop" ? "Pick a session in the Resume panel." : "Use the Resume button in the toolbar."));
       return;
     }
+    // Autopilot and approvals are the approve permission's: a command may not get around it.
+    if (route.needsApprove && !(origin.kind === "remote" && origin.granted?.includes("approve"))) {
+      this.commandPrint(style.yellow("This device may not change approvals or Autopilot (it needs the approve permission)."));
+      return;
+    }
     this.commandBusy = true;
     try {
+      if (route.name === "restart" && origin.kind === "remote") {
+        await this.restartAskedOnPage(false);
+        return;
+      }
       await this.ensureStarted();
       if (route.name === "clear" || route.name === "new" || (route.name === "chat" && sub === "new")) {
         await this.newSession();
@@ -297,7 +306,7 @@ export class ChatSession implements RemoteChat {
 
   /** A line from a command, into its card. */
   private commandPrint(text: string): void {
-    this.commandPost({ type: "commandOutput", run: this.commandRun, segments: ansiSegments(text) });
+    this.showOnScreens({ type: "commandOutput", run: this.commandRun, segments: ansiSegments(text) });
   }
 
   /**
@@ -305,9 +314,8 @@ export class ChatSession implements RemoteChat {
    * and the remote pages, which share one stream, so one device can't be
    * singled out). Not recorded in the transcript: a reload doesn't show it.
    */
-  private commandPost(msg: unknown): boolean {
-    this.targets.broadcast(msg);
-    return this.targets.size > 0;
+  private showOnScreens(msg: unknown): boolean {
+    return this.targets.broadcast(msg);
   }
 
   /** What the terminal chat's command code needs, from this tab. */
@@ -321,23 +329,14 @@ export class ChatSession implements RemoteChat {
         return this.transport.client;
       },
       runBusy: async (label, fn) => {
-        this.commandPost({ type: "status", text: `${label}…` });
+        this.showOnScreens({ type: "status", text: `${label}…` });
         try {
           return await fn();
         } finally {
-          this.commandPost({ type: "status", text: "" });
+          this.showOnScreens({ type: "status", text: "" });
         }
       },
-      confirm: (question) =>
-        new Promise<boolean>((resolve) => {
-          const id = this.commandRun;
-          this.confirms.get(id)?.(false);
-          this.confirms.set(id, resolve);
-          if (!this.commandPost({ type: "confirm", id, question })) {
-            this.confirms.delete(id);
-            resolve(false);
-          }
-        }),
+      confirm: (question) => this.askConfirm(question, this.commandRun),
       cwd: () => this.workspaceCwd(),
       cols: () => 100,
       cliPath: () => this.cliPath,
@@ -388,7 +387,7 @@ export class ChatSession implements RemoteChat {
   }
 
   /** A message from a remote device that passed the policy (see remote/remotePolicy.ts). */
-  async send(msg: RemoteMessage, device: { id: string; name: string }): Promise<void> {
+  async send(msg: RemoteMessage, device: { id: string; name: string }, granted?: readonly Permission[]): Promise<void> {
     if (msg.type === "ready") {
       // The page already has its snapshot; only the engine may still need starting.
       if (!this.transport) {
@@ -396,7 +395,7 @@ export class ChatSession implements RemoteChat {
       }
       return;
     }
-    await this.onMessage(msg, NO_PAGE, { kind: "remote", device: device.name });
+    await this.onMessage(msg, NO_PAGE, { kind: "remote", device: device.name, granted });
   }
 
   // --- UI message handling ---
@@ -478,11 +477,12 @@ export class ChatSession implements RemoteChat {
         );
         break;
       case "confirmAnswer": {
-        // Any screen of this chat may answer; the first answer counts.
+        // Any screen of this chat may answer; the first answer counts. An id nobody asked is ignored.
         const resolve = this.confirms.get(Number(msg.id));
-        this.confirms.delete(Number(msg.id));
-        resolve?.(msg.yes === true);
-        this.commandPost({ type: "confirmDone", id: Number(msg.id) }); // the other screens drop their card
+        if (resolve) {
+          resolve(msg.yes === true);
+          this.showOnScreens({ type: "confirmDone", id: Number(msg.id) }); // the other screens drop their card
+        }
         break;
       }
       case "steerPrompt":
@@ -502,7 +502,7 @@ export class ChatSession implements RemoteChat {
         break;
       case "restart":
         // The Mac asks in a VS Code dialog; a remote device is asked on its own page, not on the Mac.
-        await (origin.kind === "remote" ? this.confirmRestartOnPage(origin.device) : this.confirmRestart());
+        await (origin.kind === "remote" ? this.restartAskedOnPage(true) : this.confirmRestart());
         break;
       case "newTab":
         this.hooks.newTab();
@@ -1033,22 +1033,52 @@ export class ChatSession implements RemoteChat {
     await this.restart();
   }
 
-  /** Restart asked from a remote device: the question goes to the chat's pages, not to a dialog on the Mac. */
-  private async confirmRestartOnPage(device: string): Promise<void> {
-    this.commandOrigin = { kind: "remote", device };
-    const run = ++this.commandRun;
-    const yes = await new Promise<boolean>((resolve) => {
-      this.confirms.get(run)?.(false);
-      this.confirms.set(run, resolve);
-      if (!this.commandPost({ type: "confirm", id: run, question: "Restart the Kiro engine and start a new session? This clears the chat and stops a reply in progress." })) {
-        this.confirms.delete(run);
-        resolve(false);
+  /**
+   * Restart asked from a remote device: the question goes to the chat's pages,
+   * not to a dialog on the Mac. `fromButton`: not from a command, so no command
+   * may be running or start while the question is open.
+   */
+  private async restartAskedOnPage(fromButton: boolean): Promise<void> {
+    if (fromButton) {
+      if (this.commandBusy) {
+        this.post({ type: "notice", text: "A command is still running. Try again when it is done.", isError: true });
+        return;
+      }
+      this.commandBusy = true;
+    }
+    try {
+      if (await this.askConfirm("Restart the Kiro engine and start a new session? This clears the chat and stops a reply in progress.")) {
+        this.post({ type: "restarting" });
+        await this.restart();
+      }
+    } finally {
+      if (fromButton) {
+        this.commandBusy = false;
+      }
+    }
+  }
+
+  /**
+   * Ask Yes or No on every screen of this chat. False for No, when no screen
+   * got the question, or when nobody answers in time (so a command never waits
+   * forever). `run`: the command whose card the question goes under.
+   */
+  private askConfirm(question: string, run?: number): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const id = ++this.confirmSeq;
+      const finish = (yes: boolean, tellScreens: boolean): void => {
+        clearTimeout(timer);
+        if (this.confirms.delete(id) && tellScreens) {
+          this.showOnScreens({ type: "confirmDone", id });
+        }
+        resolve(yes);
+      };
+      const timer = setTimeout(() => finish(false, true), this.confirmTimeoutMs);
+      this.confirms.set(id, (yes) => finish(yes, false));
+      if (!this.showOnScreens({ type: "confirm", id, question, ...(run ? { run } : {}) })) {
+        finish(false, false);
       }
     });
-    if (yes) {
-      this.post({ type: "restarting" });
-      await this.restart();
-    }
   }
 
   async restart(): Promise<void> {
@@ -1163,6 +1193,9 @@ export class ChatSession implements RemoteChat {
   /** The chat's tab/view was closed: stop its engine. */
   dispose(): void {
     this.disposed = true;
+    for (const answer of [...this.confirms.values()]) {
+      answer(false); // a command waiting on a Yes/No question ends
+    }
     this.hostSub?.dispose();
     this.host = undefined;
     this.targets.clear();

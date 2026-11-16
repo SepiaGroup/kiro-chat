@@ -66,13 +66,20 @@ export class UiTargets {
     return [...this.entries.values()].filter((e) => e.kind === "remote").length;
   }
 
-  /** Send to every screen that should see it. One failing screen does not stop the rest. */
-  broadcast(msg: unknown): void {
+  /**
+   * Send to every screen that should see it. One failing screen does not stop
+   * the rest. True if at least one screen was sent it (a remote screen that
+   * is not ready yet is skipped).
+   */
+  broadcast(msg: unknown): boolean {
+    let sent = false;
     for (const [target, e] of [...this.entries]) {
       if (e.kind === "desktop" || e.ready) {
         deliver(target, msg);
+        sent = true;
       }
     }
+    return sent;
   }
 
   /** A request meant for the desktop UI only. False if no desktop page is ready for it yet. */

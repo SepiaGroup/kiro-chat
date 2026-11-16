@@ -75,11 +75,16 @@ test("an approval keeps the answer, reason, rule and folder", () => {
     toolCallId: "t1",
     optionId: "reject_once",
     reason: "no thanks",
-    rule: "entire-tool",
+    rule: "tool",
     folder: "/tmp",
     extra: true,
   });
-  assert.deepEqual(m, { type: "approve", toolCallId: "t1", optionId: "reject_once", reason: "no thanks", rule: "entire-tool", folder: "/tmp" });
+  assert.deepEqual(m, { type: "approve", toolCallId: "t1", optionId: "reject_once", reason: "no thanks", rule: "tool", folder: "/tmp" });
+  refused({ type: "approve", toolCallId: "t", optionId: "a", rule: "everything" }, 400);
+  refused({ type: "approve", toolCallId: "t", optionId: "a", rule: 5 }, 400);
+  for (const rule of ["exact", "pattern", "folder", "tool"]) {
+    assert.equal(ok({ type: "approve", toolCallId: "t", optionId: "a", rule }).rule, rule);
+  }
   refused({ type: "approve", optionId: "allow_once" }, 400);
   refused({ type: "approve", toolCallId: "t", optionId: "" }, 400);
   refused({ type: "approve", toolCallId: "t".repeat(300), optionId: "a" }, 400);

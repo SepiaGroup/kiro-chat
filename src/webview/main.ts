@@ -202,7 +202,7 @@ window.addEventListener("message", (e: MessageEvent) => {
       addCommandOutput(Number(msg.run), msg.segments as Segment[]);
       break;
     case "confirm":
-      askConfirm(Number(msg.id), String(msg.question ?? ""));
+      askConfirm(Number(msg.id), String(msg.question ?? ""), msg.run === undefined ? undefined : Number(msg.run));
       break;
     case "confirmDone":
       dropConfirm(Number(msg.id));

@@ -16,12 +16,57 @@ export const TAB_UNAVAILABLE: Record<string, string> = {
   quit: "Close the tab to end this chat.",
 };
 
-/** Commands that would act on the Mac's own screen, so a remote device is told instead. */
-export const REMOTE_UNAVAILABLE: Record<string, string> = {
-  copy: "/copy would copy to the Mac's clipboard. Use the Copy button on a code block.",
-  login: "/login opens a terminal on the Mac. Log in there, then use /restart.",
-  remote: "/remote starts or stops remote access on the Mac; stopping it would cut this device off.",
+/**
+ * What a remote device may run: an allow-list, so a new command is blocked
+ * until it is decided here. Left out is whatever acts on the Mac itself:
+ * opens an editor, a dialog or a terminal there, writes a file to a path the
+ * device names, reads a path into the context, or touches the clipboard.
+ */
+const REMOTE_ALLOWED = new Set([
+  "help", "clear", "new", "resume", "compact", "title", "model", "effort", "plan", "prompts",
+  "mcp", "hooks", "code", "config", "usage", "stats", "changelog", "restart",
+  "chat", "context", "knowledge", "agent", "tools", "autopilot", "set",
+]);
+
+/** Allowed first words of the argument, for the commands that are only partly allowed (the rest names a path on the Mac or opens something). */
+const REMOTE_SUBS: Record<string, { subs: string[]; why: string }> = {
+  chat: { subs: ["", "new", "load"], why: "/chat save writes a file on the Mac." },
+  context: { subs: ["", "show", "remove", "clear"], why: "/context add reads a path on the Mac into the context." },
+  knowledge: { subs: ["", "show", "remove", "clear", "cancel"], why: "/knowledge add and update read a path on the Mac." },
 };
+
+/** Settings a device may change with /set (the Settings panel's), and the one that takes approvals away. */
+const REMOTE_SET_IDS = ["model", "effortLevel", "autopilot", "memoryReflection", "contentCollection"];
+
+export type RemoteCheck = { ok: true; needsApprove?: boolean } | { ok: false; reason: string };
+
+/** Whether a remote device may run this command, and whether it also needs the approve permission (anything that turns Autopilot on or off). */
+export function remoteCheck(name: string, arg: string): RemoteCheck {
+  if (!REMOTE_ALLOWED.has(name)) {
+    return { ok: false, reason: `/${name} acts on the Mac itself (an editor, a terminal, a file or the clipboard there), so it isn't available from a remote device.` };
+  }
+  const words = arg.trim().split(/\s+/);
+  const sub = (words[0] ?? "").toLowerCase();
+  const partly = REMOTE_SUBS[name];
+  if (partly && !partly.subs.includes(sub)) {
+    return { ok: false, reason: `${partly.why} It isn't available from a remote device.` };
+  }
+  if (name === "agent" && (sub === "create" || sub === "edit")) {
+    return { ok: false, reason: `/agent ${sub} opens a file in VS Code on the Mac, so it isn't available from a remote device.` };
+  }
+  if (name === "autopilot") {
+    return sub ? { ok: true, needsApprove: true } : { ok: true };
+  }
+  if (name === "tools" && sub) {
+    return sub === "trust-all" || sub === "reset" ? { ok: true, needsApprove: true } : { ok: true };
+  }
+  if (name === "set" && sub) {
+    return REMOTE_SET_IDS.includes(words[0])
+      ? words[0] === "autopilot" ? { ok: true, needsApprove: true } : { ok: true }
+      : { ok: false, reason: `A remote device can change these settings with /set: ${REMOTE_SET_IDS.join(", ")}.` };
+  }
+  return { ok: true };
+}
 
 export interface TabCommand {
   name: string;
@@ -31,7 +76,7 @@ export interface TabCommand {
 }
 
 function usable(c: CommandSpec, remote = false): boolean {
-  return !c.unavailable && !TAB_UNAVAILABLE[c.name] && !(remote && REMOTE_UNAVAILABLE[c.name]);
+  return !c.unavailable && !TAB_UNAVAILABLE[c.name] && !(remote && !REMOTE_ALLOWED.has(c.name));
 }
 
 /** For the "/" picker in a chat tab (`remote`: on a remote device's page). */
@@ -47,7 +92,7 @@ export function tabCommandList(remote = false): TabCommand[] {
 export type SlashRoute =
   /** Not a command of ours: the agent gets the line (engine commands, paths, " /text"). */
   | { kind: "agent" }
-  | { kind: "run"; name: string; arg: string; text: string }
+  | { kind: "run"; name: string; arg: string; text: string; /** A remote device needs the approve permission for it. */ needsApprove?: boolean }
   | { kind: "unavailable"; text: string; reason: string }
   | { kind: "unknown"; text: string; name: string };
 
@@ -62,8 +107,13 @@ export function routeSlash(text: string, engineCommands: ReadonlyArray<{ name: s
   const word = m?.[1] ?? "";
   const spec = findCommand(word);
   if (spec) {
-    const reason = spec.unavailable ?? TAB_UNAVAILABLE[spec.name] ?? (remote ? REMOTE_UNAVAILABLE[spec.name] : undefined);
-    return reason ? { kind: "unavailable", text: trimmed, reason } : { kind: "run", name: spec.name, arg: (m?.[2] ?? "").trim(), text: trimmed };
+    const arg = (m?.[2] ?? "").trim();
+    const check: RemoteCheck = remote ? remoteCheck(spec.name, arg) : { ok: true };
+    const reason = spec.unavailable ?? TAB_UNAVAILABLE[spec.name] ?? (check.ok ? undefined : check.reason);
+    if (reason) {
+      return { kind: "unavailable", text: trimmed, reason };
+    }
+    return { kind: "run", name: spec.name, arg, text: trimmed, ...(check.ok && check.needsApprove ? { needsApprove: true } : {}) };
   }
   if (engineCommands.some((c) => c.name.toLowerCase() === word.toLowerCase())) {
     return { kind: "agent" };
@@ -90,7 +140,7 @@ export function tabHelp(engineCommands: ReadonlyArray<{ name: string; descriptio
   lines.push(
     "",
     style.gray("Start a line with a space to send /… to the agent as text."),
-    style.gray(`Not available here: ${Object.keys(remote ? { ...TAB_UNAVAILABLE, ...REMOTE_UNAVAILABLE } : TAB_UNAVAILABLE).map((n) => "/" + n).join(", ")}.`)
+    style.gray(`Not available here: ${Object.keys(TAB_UNAVAILABLE).map((n) => "/" + n).join(", ")}.`)
   );
   return lines.join("\n");
 }

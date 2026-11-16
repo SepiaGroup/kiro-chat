@@ -159,12 +159,25 @@ share one stream per chat, so one device cannot be singled out), as
 doesn't show it), but the remote event log keeps it for a reconnect. A
 command's y/n question is a `confirm` / `confirmAnswer` pair; the first answer
 wins and `confirmDone` removes the card elsewhere. Lines from a remote device
-run as commands too, except `/copy`, `/login` and `/remote` (`REMOTE_UNAVAILABLE`
-in `webCommands.ts`). A remote Restart asks with a confirm card, not the modal
-dialog on the Mac. The chat's `ready` message carries `slash: true`; a page
-turns on `body.slash-chat` from it (rule buttons, Restart, Resume, new tab,
-Settings and the "/" menu), so a terminal chat shown on the same page gets
-none of those.
+run as commands too, but through an allow-list (`remoteCheck` in
+`webCommands.ts`): a command is refused for a remote device until it is added
+there, so a new command is safe by default. Left out is what acts on the Mac
+itself (an editor, terminal or dialog there, a file written to a path the
+device names, a path read into the context, the clipboard). `autopilot`,
+`tools trust-all|reset` and `set autopilot` also need the `approve` permission,
+which the server hands to `ChatSession.send` (as `granted`) for this check;
+`/set` is limited to `REMOTE_SET_IDS`. A remote Restart asks with a confirm
+card, not the modal dialog on the Mac. Confirm questions have their own ids,
+a 5 minute timeout (then No), and end as No when no screen got them
+(`UiTargets.broadcast` says whether one did), so a command never waits forever.
+
+The chat's `ready` message carries `slash: true`, and a page turns on
+`body.slash-chat` from it (rule buttons, Restart, Resume, new tab, Settings and
+the "/" menu). That is only how the page looks. What runs is decided on the
+extension side: `remotePolicy.ts` bounds each message, and a terminal chat
+(`RemoteActions`) does nothing for `restart`, `newTab`, `resumeSession`,
+`loadSession`, `confirmAnswer` or settings other than Model and Effort, and
+passes `onceOnly` for approvals (a rule is dropped).
 
 The webview's messages are handled in `ChatSession.onMessage` (the
 `switch` on `msg.type`) and `webview/main.ts` (the `message` listener); those

@@ -54,7 +54,7 @@ export function dropConfirm(id: number): void {
 }
 
 /** A command asks Yes or No (Esc or No: no). */
-export function askConfirm(id: number, question: string): void {
+export function askConfirm(id: number, question: string, run?: number): void {
   const card = div("cmd-confirm");
   card.dataset.id = String(id);
   card.setAttribute("role", "group");
@@ -80,7 +80,7 @@ export function askConfirm(id: number, question: string): void {
     }
   });
   card.appendChild(row);
-  (cardFor(id) ?? messagesEl).appendChild(card);
+  (run === undefined ? messagesEl : (cardFor(run) ?? messagesEl)).appendChild(card);
   row.querySelector("button")?.focus();
   scrollToBottom();
 }

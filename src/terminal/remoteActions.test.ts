@@ -131,3 +131,26 @@ test("without an engine a prompt and the context card say so", async () => {
   await r.actions.handle({ type: "getContextBreakdown" }, "iPhone");
   assert.deepEqual(r.posted.map((m) => m.type), ["error", "contextBreakdown"]);
 });
+
+test("a terminal chat ignores what only a chat tab takes, and drops a rule from an approval", async () => {
+  const r = rig();
+  // The policy lets these through for every chat; the terminal does none of them.
+  for (const msg of [
+    { type: "restart" },
+    { type: "newTab" },
+    { type: "resumeSession" },
+    { type: "loadSession", sessionId: "s1" },
+    { type: "confirmAnswer", id: 1, yes: true },
+    { type: "setConfig", id: "autopilot", value: "on" },
+    { type: "setConfig", id: "memoryReflection", value: "on" },
+  ]) {
+    await r.actions.handle(msg, "iPhone");
+  }
+  assert.deepEqual(r.calls, []);
+  assert.deepEqual(r.printed, []);
+  assert.deepEqual(r.shown, []);
+  // A rule on an Allow-once answer is not passed on; a rule option is refused (onceOnly).
+  r.actions.track(approval("tc1", 7));
+  await r.actions.handle({ type: "approve", toolCallId: "tc1", optionId: "a1", rule: "tool", folder: "/tmp" }, "iPhone");
+  assert.deepEqual(r.calls.at(-1), ["approve", 7, { optionId: "a1" }, { onceOnly: true }]);
+});

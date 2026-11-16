@@ -209,12 +209,20 @@ create allow or deny rules, switch Autopilot on, restart the engine, resume a
 session, open a tab and run `/` commands (`/usage`, `/context`, `/compact`,
 `/tools trust-all`, …; their output shows on the phone and in the tab). If a
 device is lost, remove it (**Remove Remote Device…**) or take it out of your
-tailnet. What would act on the Mac's own screen is left out: logging in
-(`/login`), `/remote` and `/copy` say why. Restart asks on the phone, not in a
-dialog on the Mac. Of the `kiroCliChat.remote.permissions`, `prompt` covers
-commands, Restart, Resume and new tabs, and `approve` covers the approval
-buttons and the Autopilot switch (typing `/autopilot` needs only `prompt`).
-The page fits a phone (light or dark
+tailnet. **If you paired a device before this version, it can now do all of
+this.** To keep a device to Allow once and Deny, take `approve` out of
+`kiroCliChat.remote.permissions`.
+
+What would act on the Mac itself is left out, and the command says so:
+logging in, `/remote`, `/copy`, `/settings`, `/theme`, `/transcript`,
+`/chat save`, `/agent create` and `/agent edit` (they open an editor, a
+terminal or a file there), and `/context add` and `/knowledge add|update`
+(they read a path on the Mac). `/set` changes only the Settings panel's
+options. Restart asks on the phone, not in a dialog on the Mac. Of the
+`kiroCliChat.remote.permissions`, `prompt` covers commands, Restart, Resume and
+new tabs, and `approve` covers the approval buttons and everything that
+changes approvals or Autopilot: the switch, `/autopilot`, `/tools trust-all`,
+`/tools reset` and `/set autopilot`. The page fits a phone (light or dark
 by the device's setting, large buttons, Enter adds a line and the Send button
 sends) and can be added to the home screen. The settings below are machine
 settings, so a workspace cannot turn remote access on.

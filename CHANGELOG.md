@@ -5,7 +5,8 @@
 First release.
 
 - `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
-- Remote devices can do what you can at the keyboard in a chat tab: all the approval choices (rules included), Autopilot and the other settings, Restart, Resume, new tabs and the `/` commands, with their output on the phone. `/login`, `/remote` and `/copy` stay on the Mac. Terminal chats on the phone are unchanged.
+- Security: a paired device is now trusted like you at the keyboard in a chat tab (before: Allow once and Deny only). Take `approve` out of `kiroCliChat.remote.permissions` to keep a device narrow. Anything that changes approvals or Autopilot needs `approve`, also when typed as a command.
+- Remote devices can do what you can at the keyboard in a chat tab: all the approval choices (rules included), Autopilot and the other settings, Restart, Resume, new tabs and the `/` commands, with their output on the phone. What acts on the Mac itself (login, `/remote`, `/copy`, `/settings`, `/theme`, `/transcript`, `/chat save`, `/agent create|edit`, `/context add`, `/knowledge add|update`) is refused, and `/set` is limited to the Settings panel's options. Terminal chats on the phone are unchanged.
 - Slash commands work in chat tabs: `/usage`, `/context`, `/tools`, `/model`, `/compact`, `/help` and the rest of the terminal chat's commands run there, with their output in a card. Before, they went to the agent as text.
 - Fixed: the chat didn't follow a tool card as it grew, and a command's output box showed the start of the output instead of the end.
 - Remote access shows terminal chats too: watch them, prompt, stop, and answer approvals and questions from the phone.

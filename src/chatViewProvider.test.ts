@@ -377,6 +377,8 @@ test("the session gets the name once the engine runs, a failure says so, and a s
   chat.transport = undefined;
 });
 
+const ALL_PERMS = ["view", "prompt", "approve"] as const;
+
 /** A chat tab with a fake persistent engine, ready for commands. */
 async function commandTab() {
   const p = makeProvider();
@@ -444,18 +446,20 @@ test("the agent's own commands go to the agent; a remote device runs commands to
   // A remote device's command runs, and its output reaches every screen, naming the device.
   const seen: Array<Record<string, unknown>> = [];
   const stop = t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
-  await t.chat.send({ type: "sendPrompt", text: "/usage", images: [] }, { id: "d", name: "iPhone" });
+  await t.chat.send({ type: "sendPrompt", text: "/usage", images: [] }, { id: "d", name: "iPhone" }, ALL_PERMS);
   assert.deepEqual(t.calls.map((c) => c[0]), ["_kiro/account/getUsage"]);
   assert.deepEqual(t.prompts, ["/context-gatherer look"]);
   assert.equal(seen.find((m) => m.type === "commandStart")?.text, "/usage  (from iPhone)");
   assert.ok(seen.some((m) => m.type === "commandOutput"));
   assert.ok(t.tab.webview.sent.some((m) => m.type === "commandOutput"), "the Mac's tab shows it too");
-  // The Mac's own screen: /copy and /remote say why not.
-  await t.chat.send({ type: "sendPrompt", text: "/copy", images: [] }, { id: "d", name: "iPhone" });
-  await t.chat.send({ type: "sendPrompt", text: "/remote stop", images: [] }, { id: "d", name: "iPhone" });
+  // What acts on the Mac itself says why not and runs nothing.
+  const before = t.calls.length;
+  for (const line of ["/copy", "/remote stop", "/transcript show", "/chat save /tmp/x", "/context add ~/.ssh", "/settings"]) {
+    await t.chat.send({ type: "sendPrompt", text: line, images: [] }, { id: "d", name: "iPhone" }, ALL_PERMS);
+  }
   const text = seen.filter((m) => m.type === "commandOutput").map((m) => (m.segments as Array<{ text: string }>).map((s) => s.text).join("")).join("\n");
-  assert.match(text, /clipboard/);
-  assert.match(text, /cut this device off/);
+  assert.equal(text.match(/isn't available from a remote device/g)?.length, 6);
+  assert.equal(t.calls.length, before);
   stop();
   t.chat.transport = undefined;
 });
@@ -479,12 +483,12 @@ test("a remote device's restart is asked on its page, not in a dialog on the Mac
   t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
   let restarted = 0;
   t.chat.restart = async () => void restarted++;
-  const done = t.chat.send({ type: "restart" }, { id: "d", name: "iPhone" });
+  const done = t.chat.send({ type: "restart" }, { id: "d", name: "iPhone" }, ALL_PERMS);
   await tick();
   const ask = seen.find((m) => m.type === "confirm");
   assert.match(String(ask?.question), /Restart the Kiro engine/);
   assert.equal(restarted, 0, "waits for the answer");
-  await t.chat.send({ type: "confirmAnswer", id: ask?.id, yes: true }, { id: "d", name: "iPhone" });
+  await t.chat.send({ type: "confirmAnswer", id: ask?.id, yes: true }, { id: "d", name: "iPhone" }, ALL_PERMS);
   await done;
   assert.equal(restarted, 1);
   assert.ok(seen.some((m) => m.type === "confirmDone" && m.id === ask?.id), "the other screens drop the question");
@@ -494,8 +498,104 @@ test("a remote device's restart is asked on its page, not in a dialog on the Mac
   const answers: unknown[][] = [];
   t.chat.transport = { mode: "persistent", client: { respondToApproval: (...a: unknown[]) => (answers.push(a), "allow_always") } };
   t.chat.pendingApprovals.set("tc1", "req1");
-  await t.chat.send({ type: "approve", toolCallId: "tc1", optionId: "allow_always", rule: "tool" }, { id: "d", name: "iPhone" });
+  await t.chat.send({ type: "approve", toolCallId: "tc1", optionId: "allow_always", rule: "tool" }, { id: "d", name: "iPhone" }, ALL_PERMS);
   assert.deepEqual(answers, [["req1", { optionId: "allow_always", rule: "tool" }]]);
   assert.ok(seen.some((m) => (m.event as { label?: string } | undefined)?.label === "Allowed from iPhone"));
+  t.chat.transport = undefined;
+});
+
+test("a command can't get around the approve permission, and other settings stay out of /set", async () => {
+  const t = await commandTab();
+  const seen: Array<Record<string, unknown>> = [];
+  t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
+  const device = { id: "d", name: "iPhone" };
+  const setCalls: unknown[][] = [];
+  t.chat.transport.client.setConfigOption = async (...a: unknown[]) => void setCalls.push(a);
+  const auto: unknown[] = [];
+  t.chat.transport.client.setAutoApprove = (on: boolean) => void auto.push(on);
+  const prompt = ["view", "prompt"] as const;
+  for (const line of ["/autopilot on", "/tools trust-all", "/tools reset", "/set autopilot on"]) {
+    await t.chat.send({ type: "sendPrompt", text: line, images: [] }, device, prompt);
+  }
+  assert.deepEqual(auto, []);
+  assert.deepEqual(setCalls, []);
+  const out = () => seen.filter((m) => m.type === "commandOutput").map((m) => (m.segments as Array<{ text: string }>).map((s) => s.text).join("")).join("\n");
+  assert.equal(out().match(/needs the approve permission/g)?.length, 4);
+  // With approve it runs; from the Mac's own tab it always did.
+  await t.chat.send({ type: "sendPrompt", text: "/tools trust-all", images: [] }, device, ALL_PERMS);
+  assert.deepEqual(auto, [true]);
+  await t.say("/autopilot off");
+  assert.deepEqual(auto, [true, false]);
+  // /set may not change a setting outside the Settings panel's.
+  await t.chat.send({ type: "sendPrompt", text: "/set mode plan", images: [] }, device, ALL_PERMS);
+  assert.match(out(), /can change these settings with \/set/);
+  t.chat.transport = undefined;
+});
+
+test("a Yes/No question nobody can see, or nobody answers, ends as No and frees the chat", async () => {
+  const t = await commandTab();
+  // No screen gets it: the desktop target is gone.
+  t.chat.targets.clear();
+  await t.say("/knowledge clear");
+  assert.equal(t.chat.commandBusy, false);
+  assert.deepEqual(t.calls, []);
+  // Someone sees it but never answers: it times out.
+  const seen: Array<Record<string, unknown>> = [];
+  t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
+  t.chat.confirmTimeoutMs = 20;
+  await t.chat.send({ type: "sendPrompt", text: "/knowledge clear", images: [] }, { id: "d", name: "iPhone" }, ALL_PERMS);
+  assert.ok(seen.some((m) => m.type === "confirm"));
+  assert.ok(seen.some((m) => m.type === "confirmDone"), "screens drop the card");
+  assert.deepEqual(t.calls, []);
+  assert.equal(t.chat.commandBusy, false);
+  assert.equal(t.chat.confirms.size, 0);
+  t.chat.transport = undefined;
+});
+
+test("an answer to a question nobody asked is ignored and drops no card", async () => {
+  const t = await commandTab();
+  const seen: Array<Record<string, unknown>> = [];
+  t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
+  await t.chat.send({ type: "confirmAnswer", id: 1, yes: true }, { id: "d", name: "iPhone" }, ALL_PERMS);
+  assert.ok(!seen.some((m) => m.type === "confirmDone"));
+  t.chat.transport = undefined;
+});
+
+test("a remote Restart question doesn't take over a running command's card, and waits for one command at a time", async () => {
+  const t = await commandTab();
+  const seen: Array<Record<string, unknown>> = [];
+  t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
+  t.chat.restart = async () => undefined;
+  const device = { id: "d", name: "iPhone" };
+  // A command is running (its question is open): the Restart button is told to wait.
+  t.tab.webview.messages.fire({ type: "sendPrompt", text: "/knowledge clear", images: [] });
+  await tick();
+  const run = t.tab.webview.sent.filter((m) => m.type === "commandStart").length;
+  await t.chat.send({ type: "restart" }, device, ALL_PERMS);
+  assert.ok(seen.some((m) => m.type === "notice" && /still running/.test(String(m.text))));
+  assert.ok(!seen.some((m) => m.type === "confirm" && /Restart/.test(String(m.question))));
+  assert.equal(t.chat.commandRun, run, "no new command number was taken");
+  const ask = t.tab.webview.sent.find((m) => m.type === "confirm");
+  t.tab.webview.messages.fire({ type: "confirmAnswer", id: ask?.id, yes: false });
+  await tick();
+  // A remote /restart runs through the same question, from the command.
+  const done = t.chat.send({ type: "sendPrompt", text: "/restart", images: [] }, device, ALL_PERMS);
+  await tick();
+  const q = seen.filter((m) => m.type === "confirm").pop();
+  assert.match(String(q?.question), /Restart the Kiro engine/);
+  await t.chat.send({ type: "confirmAnswer", id: q?.id, yes: false }, device, ALL_PERMS);
+  await done;
+  assert.equal(t.chat.commandBusy, false);
+  t.chat.transport = undefined;
+});
+
+test("/title runs only as the first characters of the line", async () => {
+  const t = await commandTab();
+  await t.say("/title Build");
+  assert.match(String(t.tab.webview.sent.filter((m) => m.type === "notice").pop()?.text), /Title set to Build/);
+  const notices = t.tab.webview.sent.filter((m) => m.type === "notice").length;
+  await t.say(" /title Other");
+  assert.deepEqual(t.prompts, [" /title Other"], "goes to the agent as text");
+  assert.equal(t.tab.webview.sent.filter((m) => m.type === "notice").length, notices);
   t.chat.transport = undefined;
 });

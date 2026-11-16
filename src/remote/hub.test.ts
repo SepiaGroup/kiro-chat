@@ -227,10 +227,10 @@ test("a message from the phone reaches the chat in the other window, with the de
     r.perms.current = ["view", "prompt", "approve"];
     const approve = await request(r.hubPort, "POST", "/api/chats/aaaaaaaa.m2/message", {
       headers: { Cookie: r.cookie },
-      json: { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "entire-tool", folder: "/tmp" },
+      json: { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "tool", folder: "/tmp" },
     });
     assert.equal(approve.status, 204, approve.body);
-    assert.deepEqual(r.memberChats[1].sent[1].msg, { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "entire-tool", folder: "/tmp" });
+    assert.deepEqual(r.memberChats[1].sent[1].msg, { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "tool", folder: "/tmp" });
   } finally {
     await r.stop();
   }

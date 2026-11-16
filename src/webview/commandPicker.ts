@@ -23,7 +23,11 @@ let engineCommands: CommandLike[] = [];
 
 let allCommands: CommandLike[] = [...BUILTIN_COMMANDS];
 
-/** The chat shown runs "/" commands (a chat tab) or not (a terminal chat on a remote page). */
+/**
+ * The chat shown runs "/" commands (a chat tab) or not (a terminal chat on a
+ * remote page). Only the look: the extension decides what runs. Order doesn't
+ * matter: `setCommands` keeps the engine's list and merges it with these.
+ */
 export function setSlashChat(on: boolean): void {
   document.body.classList.toggle("slash-chat", on);
   BUILTIN_COMMANDS = on ? tabCommandList(remotePage) : [];

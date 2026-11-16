@@ -8,6 +8,7 @@
 // opens a file or a dialog in VS Code.
 // Pure (no vscode import).
 
+import { isRuleKind } from "../approvalRules";
 import { MAX_ANSWER, MAX_IMAGES, MAX_STEER, cleanAnswer, cleanSteer, sanitizeImages } from "../webviewInput";
 
 export type Permission = "view" | "prompt" | "approve";
@@ -169,7 +170,10 @@ export function checkRemoteMessage(raw: unknown, granted: readonly Permission[])
       }
       // Rules are allowed; the chat checks the rule kind and the folder, as for the desktop page.
       const reason = typeof m.reason === "string" ? m.reason.slice(0, 2000) : undefined;
-      const rule = str(m.rule, 40);
+      if (m.rule !== undefined && !isRuleKind(m.rule)) {
+        return bad("unknown rule kind");
+      }
+      const rule = m.rule as string | undefined;
       const folder = str(m.folder, MAX_FOLDER);
       return pass({ type, toolCallId, optionId, ...(reason ? { reason } : {}), ...(rule ? { rule } : {}), ...(folder ? { folder } : {}) });
     }
