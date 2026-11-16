@@ -42,6 +42,8 @@ export interface ChatSessionHooks {
   changed?(chat: ChatSession): void;
   /** The remote access switch, for the Settings panel (set once the extension has made it). */
   remoteAccess?(): RemoteAccessControl | undefined;
+  /** The chat was renamed: show `title` on its tab or view (undefined: back to its own name). */
+  renamed?(chat: ChatSession, title: string | undefined): void;
 }
 
 /** What the Settings panel needs from remote access (the desktop page only; remote devices cannot reach it). */
@@ -80,15 +82,19 @@ export class ChatSession implements RemoteChat {
   private disposed = false;
   // A request (from a command) to deliver once the desktop webview is ready.
   private pendingUiMessage?: unknown;
+  // A name given with /title or Rename Chat (the label is the name it opened with).
+  private customTitle?: string;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
     private readonly label: string,
     private readonly hooks: ChatSessionHooks,
-    resumeSessionId?: string
+    resumeSessionId?: string,
+    customTitle?: string
   ) {
     this.resumeSessionId = resumeSessionId;
+    this.customTitle = cleanTitle(customTitle);
   }
 
   private log(line: string): void {
@@ -132,7 +138,56 @@ export class ChatSession implements RemoteChat {
 
   /** The name shown for this chat (tab title). */
   get title(): string {
+    return this.customTitle ?? this.label;
+  }
+
+  /** The name it opened with ("Kiro Chat 2"), which a reset goes back to. */
+  get defaultTitle(): string {
     return this.label;
+  }
+
+  /**
+   * Rename the chat (undefined or blank: back to its own name). The tab, the
+   * remote chat list and the saved state follow; a new name also goes to the
+   * engine's session, so Resume lists it, as /title does in the terminal chat.
+   */
+  async rename(title: string | undefined): Promise<void> {
+    this.customTitle = cleanTitle(title);
+    this.hooks.renamed?.(this, this.customTitle);
+    this.hooks.changed?.(this);
+    this.pushTitleState();
+    const t = this.transport;
+    if (this.customTitle && t?.mode === "persistent") {
+      try {
+        await t.client.extMethod("_kiro/session/rename", { title: this.customTitle });
+      } catch (err) {
+        this.log("rename failed: " + errorMessage(err));
+      }
+    }
+  }
+
+  /** The desktop page saves the name with its state, so a reload keeps it. Not recorded. */
+  private pushTitleState(): void {
+    this.targets.postToDesktop({ type: "titleState", title: this.customTitle ?? null, defaultTitle: this.label });
+  }
+
+  /** `/title`, `/title <name>`, `/title clear`: true if `text` was one. */
+  private async titleCommand(text: string): Promise<boolean> {
+    const m = /^\/title(?:\s+([\s\S]*))?$/i.exec(text.trim());
+    if (!m) {
+      return false;
+    }
+    const arg = (m[1] ?? "").trim();
+    if (!arg) {
+      this.post({ type: "notice", text: `Title: ${this.title}  (/title <name> to change, /title clear to reset)` });
+    } else if (arg.toLowerCase() === "clear") {
+      await this.rename(undefined);
+      this.post({ type: "notice", text: "Title reset." });
+    } else {
+      await this.rename(arg);
+      this.post({ type: "notice", text: `Title set to ${this.title} (tab and session).` });
+    }
+    return true;
   }
 
   /** Tell the desktop page whether remote access is on (its Settings checkbox). Not recorded: remote pages never see it. */
@@ -206,6 +261,7 @@ export class ChatSession implements RemoteChat {
         this.targets.markReady(source);
         if (origin.kind === "desktop") {
           this.pushRemoteState();
+          this.pushTitleState();
         }
         if (this.pendingUiMessage && this.targets.kindOf(source) === "desktop") {
           deliver(source, this.pendingUiMessage);
@@ -220,9 +276,15 @@ export class ChatSession implements RemoteChat {
           void this.ensureStarted();
         }
         break;
-      case "sendPrompt":
-        await this.handlePrompt(String(msg.text ?? ""), sanitizeImages(msg.images));
+      case "sendPrompt": {
+        const text = String(msg.text ?? "");
+        // A remote device's "/title" goes to the agent as text, as everything it types does in a terminal chat.
+        if (origin.kind === "desktop" && (await this.titleCommand(text))) {
+          break;
+        }
+        await this.handlePrompt(text, sanitizeImages(msg.images));
         break;
+      }
       case "cancelTurn":
         this.cancelTurn();
         break;
@@ -928,4 +990,14 @@ export class ChatSession implements RemoteChat {
     msgs.forEach(send);
     this.log(`[resync] restored ${msgs.length} messages`);
   }
+}
+
+/** A chat name: one line, no control characters, at most 80 characters. Blank: none. */
+export function cleanTitle(title: unknown): string | undefined {
+  if (typeof title !== "string") {
+    return undefined;
+  }
+  // eslint-disable-next-line no-control-regex
+  const t = title.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").replace(/\s+/g, " ").trim();
+  return t ? [...t].slice(0, 80).join("") : undefined;
 }

@@ -55,6 +55,7 @@ class FakePanel {
 }
 
 const created: FakePanel[] = [];
+let inputBoxAnswer: string | undefined;
 const fakeVscode = {
   EventEmitter: Emitter,
   Uri: {
@@ -69,6 +70,8 @@ const fakeVscode = {
       return p;
     },
     showWarningMessage: () => Promise.resolve(undefined),
+    showInformationMessage: () => Promise.resolve(undefined),
+    showInputBox: () => Promise.resolve(inputBoxAnswer),
   },
   workspace: { workspaceFolders: undefined, getConfiguration: () => ({ get: (_k: string, d: unknown) => d }) },
 };
@@ -215,4 +218,83 @@ test("the list of chats follows the tabs, and listeners hear about changes", () 
   created[0].disposed.fire();
   assert.equal(p.chats().length, 1);
   assert.equal(changes, 3);
+});
+
+test("/title renames the tab, its saved state and the remote list; clear gives its name back", async () => {
+  const p = makeProvider();
+  let changes = 0;
+  p.onDidChangeChats(() => changes++);
+  p.newTab();
+  p.newTab();
+  const tab = created[1];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(tab);
+  chat.ensureStarted = () => Promise.resolve();
+  tab.webview.messages.fire({ type: "ready" });
+  await tick();
+  changes = 0;
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title  Build\tfix ", images: [] });
+  await tick();
+  assert.equal(tab.title, "Build fix");
+  assert.equal(chat.title, "Build fix");
+  assert.equal(changes, 1);
+  assert.deepEqual(tab.webview.sent.filter((m) => m.type === "titleState").at(-1), { type: "titleState", title: "Build fix", defaultTitle: "Kiro Chat 2" });
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.text === "Title set to Build fix (tab and session)."));
+  assert.ok(!tab.webview.sent.some((m) => m.type === "userMessage"), "not sent to the agent");
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title", images: [] });
+  await tick();
+  assert.ok(tab.webview.sent.some((m) => m.type === "notice" && String(m.text).startsWith("Title: Build fix")));
+  tab.webview.messages.fire({ type: "sendPrompt", text: "/title clear", images: [] });
+  await tick();
+  assert.equal(tab.title, "Kiro Chat 2");
+  assert.equal(chat.title, "Kiro Chat 2");
+  assert.equal(created[0].title, "Kiro Chat", "the other tab is untouched");
+});
+
+test("a renamed tab comes back renamed after a reload, and a reset still knows its own name", async () => {
+  const p = makeProvider();
+  const restored = new FakePanel("Build");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p.adoptEditorPanel(restored as any, { sessionId: "s", title: "Build", defaultTitle: "Kiro Chat 3" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(restored);
+  assert.equal(chat.title, "Build");
+  p.newTab();
+  assert.equal(created[0].title, "Kiro Chat 4");
+  await chat.rename(undefined);
+  assert.equal(restored.title, "Kiro Chat 3");
+});
+
+test("Rename Chat renames the current chat; an empty name resets it, Esc keeps it", async () => {
+  const p = makeProvider();
+  p.newTab();
+  inputBoxAnswer = "Docs";
+  await p.renameChat();
+  assert.equal(created[0].title, "Docs");
+  inputBoxAnswer = undefined;
+  await p.renameChat();
+  assert.equal(created[0].title, "Docs");
+  inputBoxAnswer = "";
+  await p.renameChat();
+  assert.equal(created[0].title, "Kiro Chat");
+});
+
+test("the panel view's name follows a rename", async () => {
+  const p = makeProvider();
+  const view = { webview: new FakeWebview(), visible: true, title: undefined as string | undefined, onDidDispose: new Emitter<void>().event, onDidChangeVisibility: new Emitter<void>().event };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p.resolveWebviewView(view as any, { state: { title: "Notes" } } as any);
+  assert.equal(view.title, "Notes");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (p as any).panelChat.rename(undefined);
+  assert.equal(view.title, undefined);
+});
+
+test("a chat name is one short line", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { cleanTitle } = require("./chatSession") as typeof import("./chatSession");
+  assert.equal(cleanTitle("  a\n\u0007b  "), "a b");
+  assert.equal(cleanTitle("   "), undefined);
+  assert.equal(cleanTitle(3), undefined);
+  assert.equal(cleanTitle("x".repeat(100))?.length, 80);
 });

@@ -76,6 +76,14 @@ Then run **Developer: Reload Window**.
 - [ ] Paste a screenshot (`Cmd+V`) → it attaches. Shift-drag an image file → it attaches.
 - [ ] Dragging a non-image file from the Explorer inserts its path.
 
+### Renaming a chat
+- [ ] In a chat tab, type `/` and pick **title**. `/title Build` renames the tab to "Build" and says "Title set to Build (tab and session)."; nothing goes to the agent. `/title` shows the name.
+- [ ] Reload the window: the tab is still "Build". `/title clear` gives it its own name back ("Kiro Chat 2"), also after the reload. A new tab gets the next number.
+- [ ] **Kiro CLI Chat: Rename Chat…** with the tab active: the box shows the name selected. A new name renames it; Esc keeps it; an empty name resets it.
+- [ ] The same in the bottom-panel chat: the view's title changes, and comes back after a reload.
+- [ ] With remote access on, the phone's chat list shows the new name within a moment. **Resume** in another chat lists the session under the new name.
+- [ ] `/title Foo` typed on the phone goes to the agent as text and does not rename.
+
 ### Approvals
 - [ ] With `autopilot` off, a file write shows a card with Allow / Create allow rule… / Deny / Deny with reason… / Create deny rule….
 - [ ] Create allow rule on a file read outside the workspace lists `Trust "<file>"` and `Trust entire tool (Read File)`. Entire tool → reading a second file doesn't ask.

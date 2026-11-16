@@ -83,6 +83,11 @@ Open Chat** opens the chat as an editor tab (set `kiroCliChat.openIn` to
   and the chat says so. Works in both chats.
 - **Input.** One line that grows as you type. Enter sends, Shift+Enter adds a
   line. Type `/` for a picker of the engine's commands, agents and skills.
+- **Renaming a chat.** `/title <name>` or **Kiro CLI Chat: Rename Chat…**
+  renames the current chat: its tab (or the panel view), the list on a remote
+  device and the session in Resume. The name stays after a reload. `/title`
+  shows the name, and `/title clear` (or an empty name in Rename Chat) gives
+  the chat its own name back ("Kiro Chat 2").
 - **Resume** lists previous sessions for this folder (title, age, message
   count). **Restart** asks before restarting the engine and clearing the chat.
   Clicking outside the Resume or Settings panel (or Esc) closes it.
@@ -198,6 +203,7 @@ on.
 | Kiro CLI Chat: New Session | Asks, then starts a fresh conversation in the current chat. |
 | Kiro CLI Chat: Resume Previous Session | Opens the current chat's Resume panel. |
 | Kiro CLI Chat: Restart Engine | Asks, then restarts the current chat's engine. |
+| Kiro CLI Chat: Rename Chat… | Renames the current chat (empty: back to its own name). |
 | Kiro CLI Chat: Log In | Runs `kiro-cli login` in a terminal. |
 | Kiro CLI Chat: Attach Image or File | File picker; images attach, other files insert their path. |
 | Kiro CLI Chat: Start / Stop Remote Access | Starts or stops the remote access server. |

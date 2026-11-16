@@ -20,6 +20,7 @@ const BUILTIN_COMMANDS: CommandLike[] = [
   { name: "compact", description: "Compact the conversation to save context", type: "builtin" },
   { name: "clear", description: "Clear the conversation", type: "builtin" },
   { name: "help", description: "Show available commands", type: "builtin" },
+  { name: "title", description: "Show, set or clear this chat's name", inputHint: "name, or clear", type: "builtin" },
 ];
 
 let allCommands: CommandLike[] = [...BUILTIN_COMMANDS];

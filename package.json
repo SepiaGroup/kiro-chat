@@ -67,6 +67,10 @@
         "title": "Kiro CLI Chat: Restart Engine"
       },
       {
+        "command": "kiroCliChat.renameChat",
+        "title": "Kiro CLI Chat: Rename Chat…"
+      },
+      {
         "command": "kiroCliChat.login",
         "title": "Kiro CLI Chat: Log In"
       },

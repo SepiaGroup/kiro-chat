@@ -84,6 +84,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("kiroCliChat.restart", async () => {
       await provider.confirmRestart();
     }),
+    vscode.commands.registerCommand("kiroCliChat.renameChat", () => provider.renameChat()),
     vscode.commands.registerCommand("kiroCliChat.login", async () => {
       await reveal();
       await provider.login();
