@@ -69,6 +69,7 @@ Then run **Developer: Reload Window**.
 
 ### Chatting
 - [ ] Replies stream as markdown (see `docs/samples/` for test content); code blocks have Copy.
+- [ ] A reply that writes, runs a tool, then writes again shows the later text below the tool card, not in the bubble above it.
 - [ ] The input starts one row high and grows with content up to 200px.
 - [ ] Enter sends, Shift+Enter adds a line; with `enterToSend` off they swap.
 - [ ] `/` opens the command picker with engine commands, agents and skills.

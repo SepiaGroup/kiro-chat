@@ -39,6 +39,11 @@ export function addUserMessage(
 }
 
 export function appendAssistant(text: string): void {
+  if (streamingBubble && messagesEl.lastElementChild !== streamingBubble) {
+    // Something came after it (a tool card, an approval, a note): the reply
+    // continues below that, in its own bubble, so the chat reads in order.
+    finalizeAssistant();
+  }
   if (!streamingBubble) {
     streamingBubble = div("msg assistant streaming");
     messagesEl.appendChild(streamingBubble);
