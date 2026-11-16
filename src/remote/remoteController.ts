@@ -215,7 +215,7 @@ export class RemoteController implements vscode.Disposable {
     this.windowId = WindowRegistry.newId();
     const tabs = this.provider.onDidChangeChats(() => server.chatsChanged());
     const terms = this.terminals.onDidChangeChats(() => server.chatsChanged());
-    this.chatSub = { dispose: () => (tabs.dispose(), terms.dispose()) };
+    this.chatSub = vscode.Disposable.from(tabs, terms);
     this.log(`window ${this.windowId} (${this.windowName()}) listening on 127.0.0.1:${this.port}`);
     this.publishSelf();
     this.role = "member"; // until it holds the hub lock
@@ -245,8 +245,8 @@ export class RemoteController implements vscode.Disposable {
       return;
     }
     this.ticking = true;
-    this.terminals.checkTitles(); // a terminal renamed from its tab: no event says so
     try {
+      this.terminals.checkTitles(); // a terminal renamed from its tab: no event says so
       this.publishSelf(); // also puts the file back if it was removed
       const hub = registry.hub();
       if (this.role === "hub" && hub?.id !== this.windowId && !registry.claimHub(this.windowId)) {

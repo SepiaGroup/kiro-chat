@@ -36,6 +36,7 @@ extension.ts ── activates, registers commands, status bar, terminal profile
 │
 ├─ terminal/terminalChat.ts  TerminalChat: one text-mode chat per terminal
 │    │                       (lifecycle, input routing, prompt, spinner, turns)
+│    ├─ remoteActions.ts     what a phone's messages do in the terminal, waiting approvals (pure)
 │    ├─ terminalRemote.ts    the chat as remote access sees it: transcript, phone messages (pure)
 │    ├─ approvalPrompt.ts    approval keys and screens, queue (pure)
 │    ├─ questionPrompt.ts    the agent's questions: choices, typed answer, checklist (pure)
@@ -178,6 +179,11 @@ keeps running here. Plan and decisions: `docs/REMOTE-CONTROL.md`.
   card off the terminal, a question likewise (`QuestionPrompt.answered`).
   Answers typed in the terminal post `approvalResolved` / `questionResolved`
   with "in the terminal" (`questionResolved` has an optional `label` for this).
+  The routing and the busy rules are in `terminal/remoteActions.ts` (pure);
+  a phone's `/compact` runs the terminal's own `/compact`.
+- Memory: every terminal chat keeps its `TerminalRemote` transcript from the
+  start, also while remote access is off, so a phone that joins later sees the
+  conversation. It has the chat tabs' limits (about 32 MB per chat, see above).
 - A message route answers 204 once the chat has the message, waiting at most
   1 s (`handOver`): a prompt's `send()` lasts until the reply ends, which would
   hold the phone's request open and run past the hub's 8 s call deadline for a
