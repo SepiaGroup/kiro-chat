@@ -7,6 +7,7 @@ import { SessionConfig } from "./sessionConfig";
 function setup(clientOk = true) {
   const printed: string[] = [];
   const calls: string[] = [];
+  const remoteOk = { value: true };
   const config = new SessionConfig();
   config.merge([
     { id: "model", name: "Model", type: "select", currentValue: "auto", options: [
@@ -35,9 +36,12 @@ function setup(clientOk = true) {
     updatePrompt: () => void calls.push("updatePrompt"),
     restart: async () => void calls.push("restart"),
     clearScreen: () => void calls.push("cls"),
-    remoteAccess: async (a: string) => void calls.push(`remote ${a}`),
+    remoteAccess: async (a: string) => {
+      calls.push(`remote ${a}`);
+      return remoteOk.value;
+    },
   } as unknown as LocalHost;
-  return { cmds: new LocalCommands(host), printed, calls };
+  return { cmds: new LocalCommands(host), printed, calls, remoteOk };
 }
 
 test("/model matches by name or value prefix and sets it", async () => {
@@ -77,15 +81,27 @@ test("simple commands go to the host; errors are printed, not thrown", async () 
   assert.match(s.printed.join("\n"), /The engine isn't running\. Type \/restart\.\nUsage: \/set <id> <value>/);
 });
 
-test("/remote starts, shows the link or stops; anything else prints the usage", async () => {
+test("/remote starts, shows the link or stops; on and off work too; anything else prints the usage", async () => {
   const s = setup();
-  await s.cmds.run("remote", "");
-  await s.cmds.run("remote", "LINK");
-  await s.cmds.run("remote", " stop ");
-  assert.deepEqual(s.calls, ["remote start", "remote link", "remote stop"]);
-  await s.cmds.run("remote", "on");
-  assert.equal(s.calls.length, 3);
+  for (const arg of ["", "LINK", " stop ", "on", "off"]) {
+    await s.cmds.run("remote", arg);
+  }
+  assert.deepEqual(s.calls, ["remote start", "remote link", "remote stop", "remote start", "remote stop"]);
+  await s.cmds.run("remote", "maybe");
+  assert.equal(s.calls.length, 5);
   assert.match(s.printed.at(-1) ?? "", /Usage: \/remote \[start \| link \| stop\]/);
+});
+
+test("/remote says the card is open only when it is", async () => {
+  const s = setup();
+  s.remoteOk.value = false;
+  await s.cmds.run("remote", "");
+  assert.match(s.printed.at(-1) ?? "", /No pairing card: see the message in VS Code/);
+  s.remoteOk.value = true;
+  await s.cmds.run("remote", "link");
+  assert.match(s.printed.at(-1) ?? "", /The pairing card is open/);
+  await s.cmds.run("remote", "stop");
+  assert.equal(s.printed.at(-1), "Remote access is off.");
 });
 
 test("/help lists commands, agent commands and keys", async () => {

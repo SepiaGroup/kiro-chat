@@ -166,7 +166,7 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] `/` shows the menu; ↑/↓, Tab, Enter and Esc work; it fits narrow terminals.
 - [ ] `/help` lists all commands; unknown `/foo` isn't sent to the model.
 - [ ] Spot-check: `/context show`, `/compact`, `/usage`, `/model`, `/rewind` (asks first), `/title`, `/spawn`, `/resume`.
-- [ ] `/remote` starts remote access and opens the pairing card in the editor (nothing secret in the terminal); `/remote link` opens a new card, `/remote stop` turns it off; `/remote x` prints the usage.
+- [ ] `/remote` starts remote access and opens the pairing card in the editor (nothing secret in the terminal); `/remote link` opens a new card, `/remote stop` turns it off; `/remote on` and `/remote off` work too; `/remote x` prints the usage. With remote access failing (untrusted workspace), the terminal says there is no card instead of claiming it opened.
 - [ ] Approvals take `y` / `n` / Tab (reason) / `t` (allow rule) / `d` (deny rule); rules are picked by number, Esc goes back. Compound lines name the command. Esc cancels a reply.
 - [ ] A question from the agent shows numbered choices: a number, your own text, an empty line (recommended choice) and Esc (skip) all work. A choice with sub-options shows a checklist (number keys toggle, Enter sends, Esc goes back).
 - [ ] `@file:path` attaches the file as in the webview chat.

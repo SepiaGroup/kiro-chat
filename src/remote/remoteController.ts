@@ -133,23 +133,22 @@ export class RemoteController implements vscode.Disposable {
   }
 
   /** Start unless it already runs. `showLink` also offers the pairing link. */
-  async start(showLink = true): Promise<void> {
+  /** True when remote access is on afterwards (and, with `showLink`, the card is open). */
+  async start(showLink = true): Promise<boolean> {
     if (this.server) {
       if (this.role === "hub" && !this.publicUrl) {
         await this.shareOnTailnet(); // the user may have fixed what was wrong
       }
-      if (showLink) {
-        await this.showLink();
-      }
-      return;
+      return showLink ? this.showLink() : true;
     }
     this.starting ??= this.startServer().finally(() => {
       this.starting = undefined;
     });
     await this.starting;
-    if (this.server && showLink) {
-      await this.showLink();
+    if (!this.server) {
+      return false; // it said why
     }
+    return showLink ? this.showLink() : true;
   }
 
   private async startServer(): Promise<void> {
@@ -384,7 +383,8 @@ export class RemoteController implements vscode.Disposable {
   }
 
   /** The pairing card: a new one-use link as a QR code and text, with buttons. */
-  async showLink(retry = false): Promise<void> {
+  /** True when the card is open afterwards. */
+  async showLink(retry = false): Promise<boolean> {
     if (!this.server) {
       return this.start(true);
     }
@@ -394,7 +394,7 @@ export class RemoteController implements vscode.Disposable {
     } catch (err) {
       this.log(`no pairing link: ${errorMessage(err)}`);
       void vscode.window.showWarningMessage(`Could not get a pairing link: ${errorMessage(err)}`);
-      return;
+      return false;
     }
     this.cardLink = info.link;
     this.cardProblem = info.problem;
@@ -416,7 +416,7 @@ export class RemoteController implements vscode.Disposable {
     if (this.card) {
       this.card.webview.html = html;
       this.card.reveal();
-      return;
+      return true;
     }
     const panel = vscode.window.createWebviewPanel("kiroCliChat.remoteCard", "Kiro Remote Access", vscode.ViewColumn.Active, { enableScripts: true });
     this.card = panel;
@@ -427,6 +427,7 @@ export class RemoteController implements vscode.Disposable {
       this.cardLink = ""; // the link is not kept once the card is closed
       this.cardProblem = undefined;
     });
+    return true;
   }
 
   private async onCardAction(action: ReturnType<typeof cardAction>): Promise<void> {
@@ -510,7 +511,8 @@ export class RemoteController implements vscode.Disposable {
   /** The status bar item's menu. */
   async menu(): Promise<void> {
     if (!this.server) {
-      return this.start(true);
+      await this.start(true);
+      return;
     }
     const picked = await vscode.window.showQuickPick(
       ["Show pairing link", "Remove a device…", "Stop remote access"].map((label) => ({ label })),
