@@ -210,7 +210,7 @@ session, open a tab and run `/` commands (`/usage`, `/context`, `/compact`,
 `/tools trust-all`, …; their output shows on the phone and in the tab). If a
 device is lost, remove it (**Remove Remote Device…**) or take it out of your
 tailnet. **If you paired a device before this version, it can now do all of
-this.** To keep a device to Allow once and Deny, take `approve` out of
+this.** To keep a device from creating rules, take `approve` out of
 `kiroCliChat.remote.permissions`.
 
 What would act on the Mac itself is left out, and the command says so:
@@ -232,8 +232,9 @@ way: the page shows the conversation, and a prompt, Stop, an approval or an
 answer from the phone acts in the terminal, which says so ("(from iPhone)",
 "Allowed from iPhone"). A prompt from the phone goes to the agent as typed: it
 never runs a terminal `/` command, and the phone offers only the agent's own
-commands there. Approvals from the phone are Allow or Deny only, and only
-Effort and Model can be changed. While a command runs in the terminal
+commands there. An approval from the phone has every choice the terminal has
+(allow, deny, with a reason, allow and deny rules, folders), and the terminal
+says what was chosen. Only Effort and Model can be changed. While a command runs in the terminal
 (`/compact`, `/resume`, …) the phone is asked to try again. The page shows the
 terminal's conversation since the terminal opened (or since `/clear`, `/new` or
 `/resume`); after `/rewind` it says the later messages are no longer part of it.

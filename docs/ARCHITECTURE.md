@@ -176,8 +176,8 @@ The chat's `ready` message carries `slash: true`, and a page turns on
 the "/" menu). That is only how the page looks. What runs is decided on the
 extension side: `remotePolicy.ts` bounds each message, and a terminal chat
 (`RemoteActions`) does nothing for `restart`, `newTab`, `resumeSession`,
-`loadSession`, `confirmAnswer` or settings other than Model and Effort, and
-passes `onceOnly` for approvals (a rule is dropped).
+`loadSession`, `confirmAnswer` or settings other than Model and Effort. An
+approval is answered in full (rule, folder, reason), like in a chat tab.
 
 The webview's messages are handled in `ChatSession.onMessage` (the
 `switch` on `msg.type`) and `webview/main.ts` (the `message` listener); those
@@ -214,10 +214,9 @@ keeps running here. Plan and decisions: `docs/REMOTE-CONTROL.md`.
   Autopilot and the other Settings options (`autopilot` needs `approve`),
   restart, resume, new tab and "/" commands. Not allowed: login, the remote
   switch, attachments and anything that opens something on the Mac.
-- A chat tab takes any approval option from a remote device. A terminal chat's
-  `RemoteActions` still passes `onceOnly` (`AcpClient.respondToApproval` throws
-  for any other option kind, leaving the request waiting) and keeps Autopilot
-  and the other settings to itself.
+- Both kinds of chat take any approval option from a remote device. An invalid
+  folder makes `AcpClient.respondToApproval` throw and the request stays
+  waiting. A terminal chat keeps Autopilot and the other settings to itself.
 - Whoever answers an approval, `ChatSession` posts `approvalResolved` with a
   label ("Allowed from <device>" or "on the desktop"), so the other screens
   drop their card and say who answered. Questions already did this.
@@ -229,7 +228,7 @@ keeps running here. Plan and decisions: `docs/REMOTE-CONTROL.md`.
   lists them; `RemoteController` serves the chat tabs and then the terminals.
   A phone's message goes to `TerminalChat.fromRemote`: prompts and steering go
   straight to the engine (no local `/` commands, no image paths read), an
-  approval is answered with `onceOnly` and `ApprovalPrompt.resolved` takes the
+  approval is answered with any option and `ApprovalPrompt.resolved` takes the
   card off the terminal, a question likewise (`QuestionPrompt.answered`).
   Answers typed in the terminal post `approvalResolved` / `questionResolved`
   with "in the terminal" (`questionResolved` has an optional `label` for this).
