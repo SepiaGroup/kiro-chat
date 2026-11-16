@@ -125,6 +125,8 @@ interface Feed {
   unsubscribe(): void;
 }
 
+/** How long a message waits for its chat before the answer (see handOver). */
+const ACCEPT_MS = 1000;
 /** A prompt with a few photos as base64 in JSON. Smaller than the chat's own limits (10 images of 10 MB): this comes over the network. */
 const MAX_BODY = 32 * 1024 * 1024;
 const MAX_SMALL_BODY = 4 * 1024;
@@ -402,14 +404,30 @@ export class RemoteServer {
       this.opts.log?.(`refused ${typeof type === "string" ? type.slice(0, 40) : "?"} from ${device.id}: ${checked.reason}`);
       return this.fail(res, checked.status, checked.reason);
     }
-    try {
-      await chat.send(checked.msg, { id: device.id, name: device.name }, granted);
-    } catch (err) {
-      this.opts.log?.(`message from ${device.id} failed: ${err instanceof Error ? err.message : String(err)}`);
+    if (!(await this.handOver(() => chat.send(checked.msg, { id: device.id, name: device.name }, granted), device.id))) {
       return this.fail(res, 500, "the chat could not take that");
     }
     res.writeHead(204);
     res.end();
+  }
+
+  /**
+   * Give a message to its chat and say whether it took it. A prompt's send
+   * lasts until the reply ends, so this waits only ACCEPT_MS: after that it
+   * counts as taken (the chat shows its own errors; a late failure is logged).
+   */
+  private async handOver(send: () => Promise<void>, deviceId: string): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settled = send().then(
+      () => true,
+      (err: unknown) => {
+        this.opts.log?.(`message from ${deviceId} failed: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+      }
+    );
+    const ok = await Promise.race([settled, new Promise<boolean>((r) => (timer = setTimeout(() => r(true), ACCEPT_MS)))]);
+    clearTimeout(timer);
+    return ok;
   }
 
   // --- streams ---
@@ -679,10 +697,7 @@ export class RemoteServer {
           return this.fail(res, checked.status, checked.reason);
         }
         const device = { id: String(body.device?.id ?? "").slice(0, 40), name: cleanDeviceName(body.device?.name) || "Device" };
-        try {
-          await chat.send(checked.msg, device);
-        } catch (err) {
-          this.opts.log?.(`message from ${device.id} failed: ${err instanceof Error ? err.message : String(err)}`);
+        if (!(await this.handOver(() => chat.send(checked.msg, device), device.id))) {
           return this.fail(res, 500, "the chat could not take that");
         }
         res.writeHead(204);

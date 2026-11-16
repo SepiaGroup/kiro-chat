@@ -113,6 +113,9 @@ The agent's questions show as numbered choices: type a number or your own
 answer, Enter sends (an empty line takes the recommended choice), Esc skips.
 `@file:path` in a prompt attaches that file, as in the webview chat.
 
+With remote access on, terminal chats show on the phone as well (see Remote
+access).
+
 Type `/` for a menu of commands: it filters as you type, ↑/↓ selects, Tab
 completes, Enter runs, Esc hides it. After a command it suggests subcommands
 and values (e.g. `/context ` → add/remove/clear/show, `/model ` → models).
@@ -188,9 +191,17 @@ Tailscale share down; nothing else of yours in `tailscale serve` is touched).
 From a remote device you cannot create allow or deny rules, turn Autopilot on,
 restart the engine, log in or open tabs. The page fits a phone (light or dark
 by the device's setting, large buttons, Enter adds a line and the Send button
-sends) and can be added to the home screen. Terminal chats are not shown. The
-settings below are machine settings, so a workspace cannot turn remote access
-on.
+sends) and can be added to the home screen. The settings below are machine
+settings, so a workspace cannot turn remote access on.
+
+**Terminal chats** are listed too ("Kiro Chat (terminal)"), and work the same
+way: the page shows the conversation, and a prompt, Stop, an approval or an
+answer from the phone acts in the terminal, which says so ("(from iPhone)",
+"Allowed from iPhone"). A prompt from the phone goes to the agent as typed: it
+never runs a terminal `/` command. While a command runs in the terminal
+(`/compact`, `/resume`, …) the phone is asked to try again. The page shows the
+terminal's conversation since the terminal opened (or since `/clear`, `/new` or
+`/resume`); after `/rewind` it says the later messages are no longer part of it.
 
 ## Commands
 

@@ -36,6 +36,8 @@ extension.ts ── activates, registers commands, status bar, terminal profile
 │
 ├─ terminal/terminalChat.ts  TerminalChat: one text-mode chat per terminal
 │    │                       (lifecycle, input routing, prompt, spinner, turns)
+│    ├─ remoteActions.ts     what a phone's messages do in the terminal, waiting approvals (pure)
+│    ├─ terminalRemote.ts    the chat as remote access sees it: transcript, phone messages (pure)
 │    ├─ approvalPrompt.ts    approval keys and screens, queue (pure)
 │    ├─ questionPrompt.ts    the agent's questions: choices, typed answer, checklist (pure)
 │    ├─ toolLog.ts           tool call lines, diffs, completion (pure)
@@ -173,6 +175,27 @@ keeps running here. Plan and decisions: `docs/REMOTE-CONTROL.md`.
 - Whoever answers an approval, `ChatSession` posts `approvalResolved` with a
   label ("Allowed from <device>" or "on the desktop"), so the other screens
   drop their card and say who answered. Questions already did this.
+- Terminal chats: each `TerminalChat` owns a `TerminalRemote`
+  (`terminal/terminalRemote.ts`, pure), which implements `RemoteChat` with its
+  own `ChatTranscript`. The terminal posts what it shows as webview messages
+  (`ready`, `userMessage`, every engine event, `cleared` on /clear, /new,
+  /resume and /restart), so the phone's page needs nothing new. `TerminalChats`
+  lists them; `RemoteController` serves the chat tabs and then the terminals.
+  A phone's message goes to `TerminalChat.fromRemote`: prompts and steering go
+  straight to the engine (no local `/` commands, no image paths read), an
+  approval is answered with `onceOnly` and `ApprovalPrompt.resolved` takes the
+  card off the terminal, a question likewise (`QuestionPrompt.answered`).
+  Answers typed in the terminal post `approvalResolved` / `questionResolved`
+  with "in the terminal" (`questionResolved` has an optional `label` for this).
+  The routing and the busy rules are in `terminal/remoteActions.ts` (pure);
+  a phone's `/compact` runs the terminal's own `/compact`.
+- Memory: every terminal chat keeps its `TerminalRemote` transcript from the
+  start, also while remote access is off, so a phone that joins later sees the
+  conversation. It has the chat tabs' limits (about 32 MB per chat, see above).
+- A message route answers 204 once the chat has the message, waiting at most
+  1 s (`handOver`): a prompt's `send()` lasts until the reply ends, which would
+  hold the phone's request open and run past the hub's 8 s call deadline for a
+  chat in another window.
 - Tailscale: after the server listens, `TailscaleServe.expose` runs `tailscale serve --bg --https=8443 http://127.0.0.1:PORT` (8443 so 443 stays free for the user's own serves; Tailscale allows 443, 8443, 10000) and the link is `https://<dns-name>:8443/#k=…`. `serve status --json` is read first, and a port used by anything but a single loopback proxy is refused. Stop runs `serve --https=8443 off`, only if this extension set it up; after a crash the stale mapping points at a dead port and is overwritten at the next start. `allowedHosts` is the tailnet name only (plus loopback). If Serve is not enabled on the tailnet, the command prints an enable URL and waits, so it runs with a timeout and the URL is shown as a button. Without Tailscale the server still runs for this Mac.
 - **Several windows.** Each VS Code window is its own extension host with its own `RemoteController`, so remote access has to join them. Every window with remote access on runs its own loopback `RemoteServer` and lists itself with `WindowRegistry` (`windowRegistry.ts`): one file per window in `<globalStorage>/remote/windows/` (id, name, port, pid) plus a `hub.lock` and a `link-token` (random, mode 0600, shared by the windows). The lock and the token are written whole to a temp file and `link`ed into place (fails if it exists, so one winner, and nobody reads a half-written file); window files are renamed into place. A stale lock is moved aside before it is removed and put back if it turns out to be a new one, so a window cannot remove the lock another just took. Files carry the Mac's boot time: one from before a restart is stale even if its pid is in use again. A window whose pid is gone is dropped, a lock whose window is gone is stale, and temp files over a minute old (a window died while writing) are removed. A 2.5 s tick in each controller keeps its file, takes the lock when there is no live hub, and (on the hub) follows the windows listed.
   - The **hub** is the window holding the lock. Only it answers the page and `/api/*` (`publicApi`), runs `tailscale serve`, owns pairing and the device list, and merges chats: its own plus those of `MemberConnection`s (`memberLink.ts`), one per other window, ids `<windowId>.<chatId>`. A phone's stream of another window's chat is that window's own SSE stream passed through byte for byte, so its `Last-Event-ID` stays valid even if the hub changes. A phone's message is checked by the hub's policy, sent to the other window with the permissions it was checked against, and checked again there.

@@ -61,15 +61,36 @@ export class ApprovalPrompt {
     this.queue = [];
   }
 
-  /** A queued approval was answered by a rule created for another one. */
+  /**
+   * An approval was answered somewhere else: by a rule created for another
+   * one, or from a remote device (then it may be the one on screen).
+   */
   resolved(ev: Extract<ChatEvent, { kind: "approvalResolved" }>): void {
-    const q = this.queue.find((a) => a.requestId === ev.requestId);
+    const onScreen = this.current?.requestId === ev.requestId ? this.current : undefined;
+    const q = onScreen ?? this.queue.find((a) => a.requestId === ev.requestId);
     if (!q) {
       return;
     }
-    this.queue = this.queue.filter((a) => a !== q);
+    if (onScreen) {
+      this.host.write(this.eraseInput(onScreen));
+      this.current = undefined;
+    } else {
+      this.queue = this.queue.filter((a) => a !== q);
+    }
     const mark = ev.allowed ? style.green("✓") : style.red("✗");
     this.host.print(`  ${mark} ${style.gray(sanitize(ev.label) + ": ")}${sanitize(q.request.part ?? q.request.question)}`);
+    if (onScreen) {
+      this.next();
+    }
+  }
+
+  /** What removes a folder or reason input line from the screen (nothing on the other pages). */
+  private eraseInput(a: PendingApproval): string {
+    if ((a.page !== "folder" && a.page !== "reason") || a.drawn === 0) {
+      return "";
+    }
+    const rows = Math.ceil(a.drawn / Math.max(1, this.host.cols()));
+    return (rows > 1 ? `\x1b[${rows - 1}A` : "") + "\r\x1b[J";
   }
 
   /** Handle a key while an approval is on screen. */
@@ -210,12 +231,7 @@ export class ApprovalPrompt {
         ? "  " + style.gray("Folder to allow (Enter to allow, Esc to go back): ")
         : "  " + style.gray("Reason (Enter to deny, Esc to go back): ");
     const text = prefix + sanitize(a.input);
-    let out = "";
-    if (a.drawn > 0) {
-      const rows = Math.ceil(a.drawn / Math.max(1, this.host.cols()));
-      out += rows > 1 ? `\x1b[${rows - 1}A` : "";
-      out += "\r\x1b[J";
-    }
+    const out = this.eraseInput(a);
     a.drawn = visibleWidth(text) || 1;
     this.host.write(out + text);
   }

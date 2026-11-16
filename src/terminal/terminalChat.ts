@@ -20,9 +20,11 @@ import { LineEditor } from "./lineEditor";
 import { LocalCommands, type RemoteAction } from "./localCommands";
 import { MenuState } from "./menuState";
 import { QuestionPrompt } from "./questionPrompt";
+import { fromLabel, RemoteActions, remoteImagesNote } from "./remoteActions";
 import { SessionConfig } from "./sessionConfig";
 import { findCommand, MenuValue, ValueSource } from "./slashCommands";
 import { ChatHost, TerminalCommands, TranscriptEntry, TurnStat, UserTurn } from "./terminalCommands";
+import { TerminalChats, TerminalRemote } from "./terminalRemote";
 import { ToolLog } from "./toolLog";
 
 type State = "starting" | "idle" | "busy" | "closed";
@@ -36,6 +38,8 @@ export interface TerminalChatOptions {
   initialPrompt?: string;
   /** Open another chat terminal running `task`. */
   spawn?: (task: string) => void;
+  /** Where remote access finds the terminal chats. */
+  remote?: TerminalChats;
 }
 
 export class TerminalChat implements vscode.Pseudoterminal {
@@ -95,6 +99,13 @@ export class TerminalChat implements vscode.Pseudoterminal {
 
   private readonly commands: TerminalCommands;
   private readonly local: LocalCommands;
+  /** What remote access shows of this chat, and how a phone answers it. */
+  private readonly remote: TerminalRemote;
+  private unlist?: () => void;
+  /** What a phone's messages do here, and the approvals and questions it may answer. */
+  private readonly remoteActions: RemoteActions;
+  /** This chat's terminal, once found (its tab's Rename changes its name). */
+  private tab?: vscode.Terminal;
 
   constructor(
     private readonly output: vscode.OutputChannel,
@@ -123,14 +134,50 @@ export class TerminalChat implements vscode.Pseudoterminal {
       write: (t) => this.write(t),
       cols: () => this.cols,
       canRespond: () => this.client !== undefined,
-      respond: (id, answer) => this.requireClient().answerQuestion(id, answer),
+      respond: (id, answer) => {
+        this.requireClient().answerQuestion(id, answer);
+        this.remoteActions.questionDone(id, answer ? "Answered in the terminal." : "Skipped in the terminal.");
+      },
     });
     this.approvals = new ApprovalPrompt({
       print: (t) => this.print(t),
       write: (t) => this.write(t),
       cols: () => this.cols,
       canRespond: () => this.client !== undefined,
-      respond: (id, answer) => this.requireClient().respondToApproval(id, answer),
+      respond: (id, answer) => {
+        const kind = this.requireClient().respondToApproval(id, answer);
+        this.remoteActions.approvalDone(id, kind.startsWith("allow"), "in the terminal");
+      },
+    });
+    this.remote = new TerminalRemote({
+      title: () => `${this.shownName()} (terminal)`,
+      busy: () => this.client?.turnRunning ?? false,
+      handle: (msg, device) => this.remoteActions.handle(msg, device),
+    });
+    this.remoteActions = new RemoteActions({
+      engine: () => this.client,
+      canAct: () => this.state === "idle" && !this.approvals.active && !this.questions.active && !this.confirmState,
+      isClosed: () => this.isClosed(),
+      print: (t) => this.print(t),
+      post: (m) => this.remote.post(m),
+      formatUser: (t) => this.formatUser(t),
+      sendPrompt: (text, device, images) => {
+        this.write(this.editor.erase()); // what was typed in the terminal stays, for after the reply
+        return this.sendPrompt(text, { device, images });
+      },
+      cancelTurn: () => this.cancelTurn(),
+      compact: async () => {
+        this.write(this.editor.erase()); // as for a prompt: the typed line comes back after
+        try {
+          return await this.commands.compact();
+        } finally {
+          if (!this.isClosed()) {
+            this.showPrompt();
+          }
+        }
+      },
+      approvalAnswered: (ev) => this.approvals.resolved(ev),
+      questionAnswered: (id, label) => this.questions.answered(id, label),
     });
   }
 
@@ -143,6 +190,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
     }
     this.write(term.bracketedPasteOn);
     this.write(style.bold(style.magenta("Kiro Chat")) + style.gray(" · text mode") + "\r\n\r\n");
+    this.unlist = this.options.remote?.add(this.remote);
     void this.start();
   }
 
@@ -267,8 +315,10 @@ export class TerminalChat implements vscode.Pseudoterminal {
       }
       this.stopSpinner();
       this.printBanner();
+      this.remote.post({ type: "ready", engine: prep.engine, mode: "persistent", autopilot: cfg.autopilot, enterToSend: cfg.enterToSend });
     } catch (err) {
       this.stopSpinner();
+      this.remote.post({ type: "error", message: `The engine did not start: ${errorMessage(err)}. Type /restart in the terminal.` });
       if (err instanceof NotLoggedInError) {
         this.print(
           style.yellow("You're not logged in to Kiro CLI.") +
@@ -295,7 +345,11 @@ export class TerminalChat implements vscode.Pseudoterminal {
   private wire(client: AcpClient): void {
     client.on("event", (ev: ChatEvent) => {
       if (this.client === client || this.state === "starting") {
+        if (this.remoteActions.track(ev)) {
+          this.options.remote?.changed(); // busy or idle, for the chat list
+        }
         this.onEvent(ev);
+        this.remote.post({ type: "event", event: ev });
       }
     });
     client.on("log", (line: string) => this.log("[acp] " + line));
@@ -322,13 +376,18 @@ export class TerminalChat implements vscode.Pseudoterminal {
       this.client = undefined;
       this.approvals.clear();
       this.questions.clear();
+      this.remoteActions.clear();
       this.endAssistant();
       this.print(style.red(`Engine exited (code ${String(code)}).`) + style.gray(" Type /restart to start it again."));
+      this.remote.post({ type: "error", message: "The engine exited. Type /restart in the terminal." });
+      this.options.remote?.changed();
     });
   }
 
   private shutdown(): void {
     this.state = "closed";
+    this.unlist?.();
+    this.unlist = undefined;
     if (this.spinnerTimer) {
       clearInterval(this.spinnerTimer);
       this.spinnerTimer = undefined;
@@ -520,21 +579,23 @@ export class TerminalChat implements vscode.Pseudoterminal {
     await this.sendPrompt(text);
   }
 
-  private async sendPrompt(text: string): Promise<void> {
+  /** Send a prompt to the agent. `remote`: it came from a device (its images come with it). */
+  private async sendPrompt(text: string, remote?: { device: string; images: PromptImage[] }): Promise<void> {
     if (!this.client) {
       this.print(style.red("The engine isn't running.") + style.gray(" Type /restart."));
       this.showPrompt();
       return;
     }
-    this.print(this.formatUser(text));
-    const { images, notes } = this.loadImages(text);
-    if (this.pendingImages.length > 0) {
+    this.print(this.formatUser(text) + (remote ? fromLabel(remote.device) : ""));
+    const { images, notes } = remote ? { images: [...remote.images], notes: remoteImagesNote(remote.images.length) } : this.loadImages(text);
+    if (!remote && this.pendingImages.length > 0) {
       images.push(...this.pendingImages.splice(0));
       notes.push(style.gray("  📎 attached clipboard image"));
     }
     for (const n of notes) {
       this.print(n);
     }
+    this.remote.post({ type: "userMessage", text, images });
     this.transcript.push({ role: "user", text });
     this.currentPrompt = text;
     this.lastTurn = undefined;
@@ -665,6 +726,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
     this.editor.addHistory(text);
     this.editor.clear();
     this.print(this.formatUser(text.trim()));
+    this.remote.post({ type: "userMessage", text: text.trim(), images: [] });
     client.steer(text).catch((err) => {
       if (!this.isClosed()) {
         this.print(style.red(errorMessage(err)));
@@ -710,6 +772,8 @@ export class TerminalChat implements vscode.Pseudoterminal {
     this.client = undefined;
     this.approvals.clear();
     this.questions.clear();
+    this.remoteActions.clear();
+    this.remote.post({ type: "cleared" }); // a new engine starts a new conversation
     this.config.clear();
     this.usagePct = undefined;
     this.updatePrompt();
@@ -822,6 +886,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
   private resetConversationState(): void {
     this.transcript = [];
     this.userTurns = [];
+    this.remote.post({ type: "cleared" });
     this.usagePct = undefined;
     this.updatePrompt();
   }
@@ -845,11 +910,19 @@ export class TerminalChat implements vscode.Pseudoterminal {
       this.transcript = this.transcript.slice(0, cut);
     }
     this.userTurns = this.userTurns.slice(0, index);
+    this.remote.post({ type: "notice", text: "The conversation was rewound in the terminal. Messages after that point are no longer part of it." });
+  }
+
+  /** The name on the terminal's tab: a Rename there wins, as it does in VS Code. */
+  private shownName(): string {
+    this.tab ??= vscode.window.terminals?.find((t) => "pty" in t.creationOptions && t.creationOptions.pty === this);
+    return this.tab?.name || (this.customTitle ? `Kiro: ${this.customTitle}` : this.name);
   }
 
   private setTitle(title: string | undefined): void {
     this.customTitle = title;
     this.nameEmitter.fire(title ? `Kiro: ${title}` : this.name);
+    this.options.remote?.changed();
   }
 
   private makeHost(): ChatHost {

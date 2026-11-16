@@ -63,6 +63,24 @@ export class QuestionPrompt {
     this.queue = [];
   }
 
+  /** The question was answered from a remote device; `label` says so. */
+  answered(requestId: RpcId, label: string): void {
+    const queued = this.queue.length;
+    this.queue = this.queue.filter((q) => q.requestId !== requestId);
+    const onScreen = this.current?.requestId === requestId ? this.current : undefined;
+    if (!onScreen && this.queue.length === queued) {
+      return;
+    }
+    if (onScreen) {
+      this.host.write(this.eraseInput(onScreen));
+      this.current = undefined;
+    }
+    this.host.print("  " + style.gray(sanitize(label)));
+    if (onScreen) {
+      this.next();
+    }
+  }
+
   /** The engine no longer waits for this question (cancelled). */
   dropped(requestId: RpcId): void {
     this.queue = this.queue.filter((q) => q.requestId !== requestId);
@@ -136,14 +154,18 @@ export class QuestionPrompt {
   /** Redraw the input line(s) in place. */
   private drawInput(q: PendingQuestion): void {
     const text = style.gray(PROMPT) + sanitize(q.input);
-    let out = "";
-    if (q.drawn > 0) {
-      const rows = Math.ceil(q.drawn / Math.max(1, this.host.cols()));
-      out += rows > 1 ? `\x1b[${rows - 1}A` : "";
-      out += "\r\x1b[J";
-    }
+    const out = this.eraseInput(q);
     q.drawn = visibleWidth(text) || 1;
     this.host.write(out + text);
+  }
+
+  /** What removes the input line from the screen. */
+  private eraseInput(q: PendingQuestion): string {
+    if (q.drawn === 0) {
+      return "";
+    }
+    const rows = Math.ceil(q.drawn / Math.max(1, this.host.cols()));
+    return (rows > 1 ? `\x1b[${rows - 1}A` : "") + "\r\x1b[J";
   }
 
   private submit(q: PendingQuestion): void {

@@ -120,3 +120,17 @@ test("without an engine to answer, the approval is dropped with a note", () => {
   assert.equal(s.p.active, false);
   assert.match(s.printed.at(-1) ?? "", /Can't answer this request/);
 });
+
+test("the approval on screen answered from a phone goes away, with who answered, and the next one shows", () => {
+  const { p, printed, written, answers, keys } = setup();
+  p.enqueue(req({ question: "first" }), 1);
+  p.enqueue(req({ question: "second" }), 2);
+  keys("\t"); // the reason input is open
+  p.resolved({ kind: "approvalResolved", toolCallId: "t", requestId: 1, allowed: false, label: "Denied from iPhone" });
+  assert.ok(written.some((w) => w.includes("\x1b[J")), "the input line is erased");
+  assert.ok(printed.includes("  ✗ Denied from iPhone: first"));
+  assert.equal(printed.at(-1)?.split("\n")[0], "? second");
+  assert.deepEqual(answers, [], "nothing more is sent to the engine");
+  keys("y");
+  assert.deepEqual(answers, [[2, { optionId: "a1" }]]);
+});

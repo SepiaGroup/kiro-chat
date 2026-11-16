@@ -11,6 +11,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import type { TerminalChats } from "../terminal/terminalRemote";
 import { ChatViewProvider } from "../chatViewProvider";
 import { assetType } from "./assets";
 import { DeviceRecord, DeviceStore, PairingCode } from "./remoteAuth";
@@ -88,7 +89,9 @@ export class RemoteController implements vscode.Disposable {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
-    private readonly provider: ChatViewProvider
+    private readonly provider: ChatViewProvider,
+    /** The terminal chats, listed after the chat tabs. */
+    private readonly terminals: TerminalChats
   ) {
     this.tailscale = new TailscaleServe(nodeRun, (line) => this.log(line), listening);
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
@@ -170,7 +173,7 @@ export class RemoteController implements vscode.Disposable {
     this.devices.onChange = () => void this.saveDevices();
     this.pairing = new PairingCode();
     const server = new RemoteServer({
-      chats: () => this.provider.chats(),
+      chats: () => [...this.provider.chats(), ...this.terminals.chats()],
       windowName: this.windowName(),
       members: () => [...this.members.values()].flatMap((m) => m.chats()),
       internal: { token: this.token },
@@ -210,7 +213,9 @@ export class RemoteController implements vscode.Disposable {
     this.server = server;
     this.registry = registry;
     this.windowId = WindowRegistry.newId();
-    this.chatSub = this.provider.onDidChangeChats(() => server.chatsChanged());
+    const tabs = this.provider.onDidChangeChats(() => server.chatsChanged());
+    const terms = this.terminals.onDidChangeChats(() => server.chatsChanged());
+    this.chatSub = vscode.Disposable.from(tabs, terms);
     this.log(`window ${this.windowId} (${this.windowName()}) listening on 127.0.0.1:${this.port}`);
     this.publishSelf();
     this.role = "member"; // until it holds the hub lock
@@ -241,6 +246,7 @@ export class RemoteController implements vscode.Disposable {
     }
     this.ticking = true;
     try {
+      this.terminals.checkTitles(); // a terminal renamed from its tab: no event says so
       this.publishSelf(); // also puts the file back if it was removed
       const hub = registry.hub();
       if (this.role === "hub" && hub?.id !== this.windowId && !registry.claimHub(this.windowId)) {
