@@ -376,3 +376,85 @@ test("the session gets the name once the engine runs, a failure says so, and a s
   assert.ok(tab.webview.sent.some((m) => m.type === "notice" && m.isError && String(m.text).includes("could not be changed: boom")));
   chat.transport = undefined;
 });
+
+/** A chat tab with a fake persistent engine, ready for commands. */
+async function commandTab() {
+  const p = makeProvider();
+  p.newTab();
+  const tab = created[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chat = (p as any).tabs.get(tab);
+  chat.ensureStarted = () => Promise.resolve();
+  const calls: unknown[][] = [];
+  const prompts: string[] = [];
+  chat.transport = {
+    mode: "persistent",
+    client: {
+      turnRunning: false,
+      extMethod: async (m: string, params: unknown) => {
+        calls.push([m, params]);
+        return m === "_kiro/account/getUsage" ? { success: true, data: { planName: "Pro", usageBreakdowns: [] } } : { success: true, message: "Cleared." };
+      },
+      prompt: async (text: string) => void prompts.push(text),
+      setAutoApprove: () => undefined,
+      setConfigOption: async () => undefined,
+    },
+  };
+  tab.webview.messages.fire({ type: "ready" });
+  await tick();
+  const say = async (text: string) => {
+    tab.webview.messages.fire({ type: "sendPrompt", text, images: [] });
+    await tick();
+    await tick();
+  };
+  const output = () =>
+    tab.webview.sent
+      .filter((m) => m.type === "commandOutput")
+      .map((m) => (m.segments as Array<{ text: string }>).map((s) => s.text).join(""))
+      .join("\n");
+  return { p, tab, chat, calls, prompts, say, output };
+}
+
+test("slash commands in a tab run the terminal chat's code, not a prompt", async () => {
+  const t = await commandTab();
+  await t.say("/usage");
+  assert.deepEqual(t.calls.map((c) => c[0]), ["_kiro/account/getUsage"]);
+  assert.deepEqual(t.tab.webview.sent.find((m) => m.type === "commandStart"), { type: "commandStart", run: 1, text: "/usage" });
+  assert.match(t.output(), /Pro/);
+  await t.say("/tools");
+  assert.match(t.output(), /Tools.*Supervised/);
+  await t.say("/nope");
+  assert.match(t.output(), /Unknown command \/nope/);
+  await t.say("/paste");
+  assert.match(t.output(), /Cmd\+V/);
+  await t.say("/help");
+  assert.match(t.output(), /\/context/);
+  assert.deepEqual(t.prompts, []);
+  assert.ok(!t.tab.webview.sent.some((m) => m.type === "userMessage"), "nothing went to the agent");
+  await t.say(" /usage as text");
+  assert.deepEqual(t.prompts, [" /usage as text"]);
+  t.chat.transport = undefined;
+});
+
+test("the agent's own commands and a remote device's lines go to the agent", async () => {
+  const t = await commandTab();
+  t.chat.conv.engineCommands = [{ name: "context-gatherer" }];
+  await t.say("/context-gatherer look");
+  await t.chat.send({ type: "sendPrompt", text: "/usage", images: [] }, { id: "d", name: "iPhone" });
+  assert.deepEqual(t.prompts, ["/context-gatherer look", "/usage"]);
+  assert.deepEqual(t.calls, []);
+  t.chat.transport = undefined;
+});
+
+test("a command's Yes/No question waits for the tab's answer", async () => {
+  const t = await commandTab();
+  t.tab.webview.messages.fire({ type: "sendPrompt", text: "/knowledge clear", images: [] });
+  await tick();
+  const ask = t.tab.webview.sent.find((m) => m.type === "confirm");
+  assert.equal(ask?.question, "Remove every entry from the knowledge base?");
+  t.tab.webview.messages.fire({ type: "confirmAnswer", id: ask?.id, yes: true });
+  await tick();
+  await tick();
+  assert.deepEqual(t.calls.map((c) => c[0]), ["_kiro/knowledge"]);
+  t.chat.transport = undefined;
+});

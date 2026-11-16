@@ -19,6 +19,12 @@ import { resetPreparedEngine } from "./enginePrep";
 import { isRuleKind } from "./approvalRules";
 import { ApprovalAnswer, ChatEvent, EngineVersion, PromptImage, RpcId } from "./types";
 import { ChatTranscript } from "./chatTranscript";
+import { ansiSegments } from "./ansiSegments";
+import { ConversationLog } from "./conversationLog";
+import { style } from "./terminal/ansi";
+import { LocalCommands } from "./terminal/localCommands";
+import { TerminalCommands, type ChatHost } from "./terminal/terminalCommands";
+import { routeSlash, tabHelp, type SlashRoute } from "./webCommands";
 import { describeError } from "./errorAdvice";
 import { errorMessage } from "./format";
 import { pickSessions } from "./sessionList";
@@ -86,6 +92,35 @@ export class ChatSession implements RemoteChat {
   private customTitle?: string;
   /** The name the engine's session was last given (Resume lists it). */
   private engineTitle?: string;
+
+  // Slash commands: the terminal chat's own code, with output shown as a card in the chat.
+  private readonly conv = new ConversationLog();
+  private readonly tabCommands = new TerminalCommands(this.commandHost());
+  private readonly localCommands = new LocalCommands({
+    ...this.commandHost(),
+    commands: () => this.tabCommands,
+    config: () => this.conv.config,
+    engine: () => this.resolvedEngine,
+    toolGroups: () => this.conv.toolGroups,
+    updatePrompt: () => undefined,
+    resetConversationState: () => this.conv.reset(),
+    newConversation: () => this.newSession(),
+    restart: () => this.confirmRestart(),
+    login: () => this.runLogin(),
+    remoteAccess: async (action) => {
+      const id = { start: "startRemoteAccess", link: "showRemoteLink", stop: "stopRemoteAccess" }[action];
+      const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroCliChat.${id}`);
+      return action === "stop" || result === true;
+    },
+    clearScreen: () => undefined,
+    exit: () => undefined,
+  });
+  /** The command whose card output goes to; a command runs one at a time. */
+  private commandRun = 0;
+  private commandBusy = false;
+  /** y/n questions a command asked (`/knowledge clear`, an existing file in `/chat save`). */
+  private readonly confirms = new Map<number, (yes: boolean) => void>();
+  private cancelRequested = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -206,6 +241,106 @@ export class ChatSession implements RemoteChat {
     return true;
   }
 
+  /**
+   * A slash command typed in this tab. It runs the terminal chat's code; what
+   * it prints shows in a card under the command. Only this tab sees it (not
+   * recorded, not sent to remote devices).
+   */
+  private async runSlash(route: Exclude<SlashRoute, { kind: "agent" }>, images: number): Promise<void> {
+    if (this.commandBusy) {
+      this.post({ type: "notice", text: "A command is still running. Try again when it is done.", isError: true });
+      return;
+    }
+    const run = ++this.commandRun;
+    this.targets.postToDesktop({ type: "commandStart", run, text: route.text });
+    if (route.kind === "unknown") {
+      this.commandPrint(style.yellow(`Unknown command /${route.name}.`) + style.gray(" Type /help to see commands (start with a space to send it to the agent as text)."));
+      return;
+    }
+    if (route.kind === "unavailable") {
+      this.commandPrint(style.yellow(route.reason));
+      return;
+    }
+    if (images > 0) {
+      this.commandPrint(style.gray("The images weren't used: a command doesn't send them. Attach them to a message."));
+    }
+    const sub = route.arg.split(/\s+/)[0]?.toLowerCase() ?? "";
+    if (route.name === "help") {
+      this.commandPrint(tabHelp(this.conv.engineCommands));
+      return;
+    }
+    if (route.name === "resume" || (route.name === "chat" && sub === "load")) {
+      this.openResumePanel();
+      this.commandPrint(style.gray("Pick a session in the Resume panel."));
+      return;
+    }
+    this.commandBusy = true;
+    try {
+      await this.ensureStarted();
+      if (route.name === "clear" || route.name === "new" || (route.name === "chat" && sub === "new")) {
+        await this.newSession();
+        return;
+      }
+      await this.localCommands.run(route.name, route.arg);
+    } finally {
+      this.commandBusy = false;
+    }
+  }
+
+  /** A line from a command, into its card. */
+  private commandPrint(text: string): void {
+    this.targets.postToDesktop({ type: "commandOutput", run: this.commandRun, segments: ansiSegments(text) });
+  }
+
+  /** What the terminal chat's command code needs, from this tab. */
+  private commandHost(): ChatHost {
+    return {
+      print: (t) => this.commandPrint(t),
+      client: () => {
+        if (this.transport?.mode !== "persistent") {
+          throw new Error(this.transport ? "Commands need the persistent (ACP) mode." : "The engine isn't running. Use Restart.");
+        }
+        return this.transport.client;
+      },
+      runBusy: async (label, fn) => {
+        this.targets.postToDesktop({ type: "status", text: `${label}…` });
+        try {
+          return await fn();
+        } finally {
+          this.targets.postToDesktop({ type: "status", text: "" });
+        }
+      },
+      confirm: (question) =>
+        new Promise<boolean>((resolve) => {
+          const id = this.commandRun;
+          this.confirms.get(id)?.(false);
+          this.confirms.set(id, resolve);
+          if (!this.targets.postToDesktop({ type: "confirm", id, question })) {
+            this.confirms.delete(id);
+            resolve(false);
+          }
+        }),
+      cwd: () => this.workspaceCwd(),
+      cols: () => 100,
+      cliPath: () => this.cliPath,
+      option: (id) => this.conv.config.option(id),
+      engineCommands: () => this.conv.engineCommands,
+      contextPercent: () => this.conv.contextPercent,
+      transcript: () => this.conv.transcript,
+      truncateConversation: () => undefined, // /rewind is terminal only
+      userTurns: () => this.conv.userTurns,
+      turnStats: () => this.conv.turnStats,
+      mcpServers: () => this.conv.mcpServers,
+      setInput: (text) => this.targets.postToDesktop({ type: "setInput", text }),
+      addPendingImage: () => undefined, // /paste is terminal only
+      setTitle: (t) => this.rename(t),
+      title: () => this.title,
+      spawn: () => undefined, // /spawn is terminal only
+      sendPrompt: (text) => this.handlePrompt(text),
+      log: (line) => this.log(line),
+    };
+  }
+
   /** Tell the desktop page whether remote access is on (its Settings checkbox). Not recorded: remote pages never see it. */
   pushRemoteState(): void {
     const control = this.hooks.remoteAccess?.();
@@ -298,6 +433,16 @@ export class ChatSession implements RemoteChat {
         if (origin.kind === "desktop" && (await this.titleCommand(text))) {
           break;
         }
+        // A remote device's lines go to the agent as typed (it may not change settings or open things here).
+        const route: SlashRoute = origin.kind === "desktop" ? routeSlash(text, this.conv.engineCommands) : { kind: "agent" };
+        if (route.kind !== "agent") {
+          await this.runSlash(route, sanitizeImages(msg.images).length);
+          break;
+        }
+        if (this.commandBusy) {
+          this.post({ type: "notice", text: "A command is still running. Send your message when it is done.", isError: true });
+          break;
+        }
         await this.handlePrompt(text, sanitizeImages(msg.images));
         break;
       }
@@ -316,6 +461,12 @@ export class ChatSession implements RemoteChat {
           origin
         );
         break;
+      case "confirmAnswer": {
+        const resolve = origin.kind === "desktop" ? this.confirms.get(Number(msg.id)) : undefined;
+        this.confirms.delete(Number(msg.id));
+        resolve?.(msg.yes === true);
+        break;
+      }
       case "steerPrompt":
         await this.handleSteer(cleanSteer(msg.text));
         break;
@@ -382,6 +533,8 @@ export class ChatSession implements RemoteChat {
     }
     // Echo the prompt (with thumbnails) into the chat.
     this.post({ type: "userMessage", text, images });
+    this.conv.promptStarted(text);
+    this.cancelRequested = false;
     try {
       if (this.transport.mode === "persistent") {
         await this.transport.client.prompt(text, images);
@@ -396,11 +549,14 @@ export class ChatSession implements RemoteChat {
       }
     } catch (err) {
       this.post({ type: "error", message: describeError(errorMessage(err), "Kiro CLI Chat: Log In") });
+    } finally {
+      this.conv.promptFinished(this.cancelRequested);
     }
   }
 
   /** Stop the reply that is running (the engine ends the turn as cancelled). */
   private cancelTurn(): void {
+    this.cancelRequested = true;
     if (this.transport?.mode === "persistent") {
       this.transport.client.cancel();
     } else if (this.transport?.mode === "one-shot") {
@@ -709,7 +865,9 @@ export class ChatSession implements RemoteChat {
   }
 
   private wireClient(client: AcpClient): void {
+    client.on("notification", (method: string, params: unknown) => this.conv.notification(method, params));
     client.on("event", (ev: ChatEvent) => {
+      this.conv.track(ev);
       if (ev.kind === "question") {
         this.pendingQuestions.set(ev.question.toolCallId, ev.requestId);
       } else if (ev.kind === "questionResolved") {
@@ -984,6 +1142,9 @@ export class ChatSession implements RemoteChat {
       this.log(`[post] ${m.type}`);
     }
     this.transcript.record(msg);
+    if (m?.type === "cleared") {
+      this.conv.reset(); // new, resumed or restarted: the commands' history starts over
+    }
     if (m?.type === "event" && m.event?.kind === "runFinished") {
       this.pendingApprovals.clear(); // the reply is over; the webview drops the cards
     }

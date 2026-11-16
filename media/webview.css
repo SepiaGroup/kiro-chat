@@ -1073,3 +1073,41 @@ html, body {
   color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
   cursor: pointer;
 }
+
+/* Slash command output (the terminal chat's text and colors). */
+.cmd-card {
+  align-self: stretch;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.cmd-card-head {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+.cmd-out {
+  margin: 4px 0 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cmd-confirm {
+  margin-top: 6px;
+}
+.cmd-confirm-q {
+  margin-bottom: 4px;
+}
+.ansi-bold { font-weight: bold; }
+.ansi-dim { opacity: 0.7; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
+.ansi-strike { text-decoration: line-through; }
+.ansi-red { color: var(--vscode-terminal-ansiRed, var(--vscode-errorForeground)); }
+.ansi-green { color: var(--vscode-terminal-ansiGreen); }
+.ansi-yellow { color: var(--vscode-terminal-ansiYellow); }
+.ansi-blue { color: var(--vscode-terminal-ansiBlue); }
+.ansi-magenta { color: var(--vscode-terminal-ansiMagenta); }
+.ansi-cyan { color: var(--vscode-terminal-ansiCyan); }
+.ansi-gray { color: var(--vscode-terminal-ansiBrightBlack, var(--vscode-descriptionForeground)); }

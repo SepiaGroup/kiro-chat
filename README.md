@@ -82,7 +82,17 @@ Open Chat** opens the chat as an editor tab (set `kiroCliChat.openIn` to
   only, inside the chat's folder). It is sent with a prompt when it changed,
   and the chat says so. Works in both chats.
 - **Input.** One line that grows as you type. Enter sends, Shift+Enter adds a
-  line. Type `/` for a picker of the engine's commands, agents and skills.
+  line. Type `/` for a picker of commands, agents and skills.
+- **Slash commands.** The terminal chat's commands work in a chat tab too
+  (`/usage`, `/context`, `/tools`, `/model`, `/agent`, `/compact`, `/mcp`,
+  `/knowledge`, `/config`, `/stats`, `/transcript`, …; `/help` lists them).
+  Their output shows in a card under the command, only in this tab (it isn't
+  kept after a reload). `/clear` and `/new` start a new conversation,
+  `/resume` opens the Resume panel. `/paste`, `/editor`, `/reply`, `/rewind`,
+  `/spawn`, `/cls` and `/quit` are for the terminal chat and say what to do
+  instead. The agent's own commands (agents, skills, saved prompts) still go to
+  the agent, and so does a line that starts with a space. Unknown commands
+  aren't sent. From a remote device every line goes to the agent as typed.
 - **Renaming a chat.** `/title <name>`, **Rename Chat…** on the tab's
   right-click menu or **Kiro CLI Chat: Rename Chat…** renames the chat: its
   tab (or the panel view), the list on a remote
