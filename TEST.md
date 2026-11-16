@@ -130,6 +130,15 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] Untrusted workspace: Start Remote Access refuses with a message.
 - [ ] Restart VS Code: remote access is off unless `kiroCliChat.remote.autoStart` is on; paired devices are still paired.
 
+### Remote access (terminal chat)
+- [ ] Open a terminal chat with remote access on: the browser's chat list shows "Kiro Chat (terminal)" without a reload, with what the terminal has shown so far. `/title Build` renames it there. Closing the terminal removes it from the list.
+- [ ] Send a prompt from the browser: the terminal shows it with "(from <browser>)" and the reply streams in both. Text typed in the terminal before stays and is back after the reply. Stop from the browser ends the reply ("Stopped from …").
+- [ ] Autopilot off, a command that needs approval: Allow in the browser and the terminal prints "✓ Allowed from <browser>" and goes on (also with the terminal's reason input open). Answer one with `y` in the terminal: the browser's card goes, with "Allowed in the terminal". A rule button in the browser is refused and the terminal still waits.
+- [ ] A question answered in the browser: the terminal prints "Answered from …" and goes on. Answered in the terminal: the browser's card goes with "Answered in the terminal."
+- [ ] `/quit` sent from the browser goes to the agent as text; the terminal stays open.
+- [ ] While `/compact` runs in the terminal, a prompt from the browser says the terminal chat is busy. `/clear` in the terminal clears the browser's view; `/restart` too, and the browser can send again after it.
+- [ ] A long reply from a chat in another window: the browser does not say "Not sent" (both kinds of chat).
+
 ### Stopping a reply (webview)
 - [ ] While the agent works, a Stop button (square) shows next to Send; it is hidden when idle. Click it: the label says "Stopping", then "■ Cancelled", and Stop disappears. The next message works.
 - [ ] Esc in the message box does the same. With the Settings or Resume panel open, Esc closes the panel first and does not stop the reply.

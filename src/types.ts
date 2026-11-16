@@ -63,7 +63,7 @@ export type ChatEvent =
   /** The agent asks a question (the `user_input` tool); answer with `AcpClient.answerQuestion`. */
   | { kind: "question"; question: Question; requestId: RpcId }
   /** A waiting question is gone (cancelled or the turn ended): remove its card. */
-  | { kind: "questionResolved"; toolCallId: string; requestId: RpcId }
+  | { kind: "questionResolved"; toolCallId: string; requestId: RpcId; label?: string }
   | { kind: "contextUsage"; usagePercentage: number; usedTokens?: number; threshold?: number }
   | { kind: "metering"; credits: number }
   /** The engine's id for the user message just sent (used by /rewind). */

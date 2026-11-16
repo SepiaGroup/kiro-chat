@@ -11,7 +11,9 @@ import { editorContextFor, readConfig } from "../config";
 import { NotLoggedInError, prepareEngine, resetPreparedEngine } from "../enginePrep";
 import { describeError } from "../errorAdvice";
 import { errorMessage, formatDuration } from "../format";
-import { AvailableCommand, ChatEvent, PromptImage } from "../types";
+import type { RemoteMessage } from "../remote/remotePolicy";
+import { AvailableCommand, ApprovalAnswer, ChatEvent, PromptImage, RpcId } from "../types";
+import { sanitizeImages } from "../webviewInput";
 import { crlf, sanitize, style, term, truncate } from "./ansi";
 import { MarkdownStream } from "./ansiMarkdown";
 import { ApprovalPrompt } from "./approvalPrompt";
@@ -23,6 +25,7 @@ import { QuestionPrompt } from "./questionPrompt";
 import { SessionConfig } from "./sessionConfig";
 import { findCommand, MenuValue, ValueSource } from "./slashCommands";
 import { ChatHost, TerminalCommands, TranscriptEntry, TurnStat, UserTurn } from "./terminalCommands";
+import { TerminalChats, TerminalRemote } from "./terminalRemote";
 import { ToolLog } from "./toolLog";
 
 type State = "starting" | "idle" | "busy" | "closed";
@@ -36,6 +39,8 @@ export interface TerminalChatOptions {
   initialPrompt?: string;
   /** Open another chat terminal running `task`. */
   spawn?: (task: string) => void;
+  /** Where remote access finds the terminal chats. */
+  remote?: TerminalChats;
 }
 
 export class TerminalChat implements vscode.Pseudoterminal {
@@ -95,6 +100,12 @@ export class TerminalChat implements vscode.Pseudoterminal {
 
   private readonly commands: TerminalCommands;
   private readonly local: LocalCommands;
+  /** What remote access shows of this chat, and how a phone answers it. */
+  private readonly remote: TerminalRemote;
+  private unlist?: () => void;
+  /** Waiting approvals and questions by tool call (a phone names the tool call it answers). */
+  private readonly pendingApprovals = new Map<string, RpcId>();
+  private readonly pendingQuestions = new Map<string, RpcId>();
 
   constructor(
     private readonly output: vscode.OutputChannel,
@@ -123,14 +134,25 @@ export class TerminalChat implements vscode.Pseudoterminal {
       write: (t) => this.write(t),
       cols: () => this.cols,
       canRespond: () => this.client !== undefined,
-      respond: (id, answer) => this.requireClient().answerQuestion(id, answer),
+      respond: (id, answer) => {
+        this.requireClient().answerQuestion(id, answer);
+        this.questionDone(id, answer ? "Answered in the terminal." : "Skipped in the terminal.");
+      },
     });
     this.approvals = new ApprovalPrompt({
       print: (t) => this.print(t),
       write: (t) => this.write(t),
       cols: () => this.cols,
       canRespond: () => this.client !== undefined,
-      respond: (id, answer) => this.requireClient().respondToApproval(id, answer),
+      respond: (id, answer) => {
+        const kind = this.requireClient().respondToApproval(id, answer);
+        this.approvalDone(id, kind.startsWith("allow"), "in the terminal");
+      },
+    });
+    this.remote = new TerminalRemote({
+      title: () => `${this.customTitle ?? this.name} (terminal)`,
+      busy: () => this.client?.turnRunning ?? false,
+      handle: (msg, device) => this.fromRemote(msg, device),
     });
   }
 
@@ -143,6 +165,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
     }
     this.write(term.bracketedPasteOn);
     this.write(style.bold(style.magenta("Kiro Chat")) + style.gray(" · text mode") + "\r\n\r\n");
+    this.unlist = this.options.remote?.add(this.remote);
     void this.start();
   }
 
@@ -267,8 +290,10 @@ export class TerminalChat implements vscode.Pseudoterminal {
       }
       this.stopSpinner();
       this.printBanner();
+      this.remote.post({ type: "ready", engine: prep.engine, mode: "persistent", autopilot: cfg.autopilot, enterToSend: cfg.enterToSend });
     } catch (err) {
       this.stopSpinner();
+      this.remote.post({ type: "error", message: `The engine did not start: ${errorMessage(err)}. Type /restart in the terminal.` });
       if (err instanceof NotLoggedInError) {
         this.print(
           style.yellow("You're not logged in to Kiro CLI.") +
@@ -295,7 +320,9 @@ export class TerminalChat implements vscode.Pseudoterminal {
   private wire(client: AcpClient): void {
     client.on("event", (ev: ChatEvent) => {
       if (this.client === client || this.state === "starting") {
+        this.track(ev);
         this.onEvent(ev);
+        this.remote.post({ type: "event", event: ev });
       }
     });
     client.on("log", (line: string) => this.log("[acp] " + line));
@@ -322,13 +349,19 @@ export class TerminalChat implements vscode.Pseudoterminal {
       this.client = undefined;
       this.approvals.clear();
       this.questions.clear();
+      this.pendingApprovals.clear();
+      this.pendingQuestions.clear();
       this.endAssistant();
       this.print(style.red(`Engine exited (code ${String(code)}).`) + style.gray(" Type /restart to start it again."));
+      this.remote.post({ type: "error", message: "The engine exited. Type /restart in the terminal." });
+      this.options.remote?.changed();
     });
   }
 
   private shutdown(): void {
     this.state = "closed";
+    this.unlist?.();
+    this.unlist = undefined;
     if (this.spinnerTimer) {
       clearInterval(this.spinnerTimer);
       this.spinnerTimer = undefined;
@@ -452,6 +485,204 @@ export class TerminalChat implements vscode.Pseudoterminal {
     }
   }
 
+  /** Keep what a phone needs to answer approvals and questions, and the chat list's busy state. */
+  private track(ev: ChatEvent): void {
+    switch (ev.kind) {
+      case "approvalRequest":
+        if (ev.requestId !== undefined) {
+          this.pendingApprovals.set(ev.request.toolCallId, ev.requestId);
+        }
+        break;
+      case "approvalResolved":
+        this.pendingApprovals.delete(ev.toolCallId);
+        break;
+      case "question":
+        this.pendingQuestions.set(ev.question.toolCallId, ev.requestId);
+        break;
+      case "questionResolved":
+        this.pendingQuestions.delete(ev.toolCallId);
+        break;
+      case "runStarted":
+        this.options.remote?.changed();
+        break;
+      case "runFinished":
+        this.pendingApprovals.clear();
+        this.options.remote?.changed();
+        break;
+      default:
+        break;
+    }
+  }
+
+  private toolCallOf(map: Map<string, RpcId>, requestId: RpcId): string | undefined {
+    for (const [toolCallId, id] of map) {
+      if (id === requestId) {
+        return toolCallId;
+      }
+    }
+    return undefined;
+  }
+
+  /** An approval was answered here or from a phone: other screens drop the card and say who. */
+  private approvalDone(requestId: RpcId, allowed: boolean, where: string): Extract<ChatEvent, { kind: "approvalResolved" }> | undefined {
+    const toolCallId = this.toolCallOf(this.pendingApprovals, requestId);
+    if (toolCallId === undefined) {
+      return undefined;
+    }
+    this.pendingApprovals.delete(toolCallId);
+    const event = { kind: "approvalResolved" as const, toolCallId, requestId, allowed, label: `${allowed ? "Allowed" : "Denied"} ${where}` };
+    this.remote.post({ type: "event", event });
+    return event;
+  }
+
+  private questionDone(requestId: RpcId, label: string): void {
+    const toolCallId = this.toolCallOf(this.pendingQuestions, requestId);
+    if (toolCallId === undefined) {
+      return;
+    }
+    this.pendingQuestions.delete(toolCallId);
+    this.remote.post({ type: "event", event: { kind: "questionResolved", toolCallId, requestId, label } });
+  }
+
+  /**
+   * A message from a remote device (checked by the server's policy). Prompts
+   * go to the agent as typed: they never run the terminal's / commands, and
+   * paths in them are not read as images.
+   */
+  private async fromRemote(msg: RemoteMessage, device: string): Promise<void> {
+    if (this.isClosed()) {
+      return;
+    }
+    const client = this.client;
+    const from = style.gray(`  (from ${sanitize(device)})`);
+    const fail = (err: unknown): void => {
+      this.remote.post({ type: "error", message: errorMessage(err) });
+    };
+    switch (msg.type) {
+      case "sendPrompt":
+      case "steerPrompt": {
+        const text = typeof msg.text === "string" ? msg.text : "";
+        const images = msg.type === "sendPrompt" ? sanitizeImages(msg.images) : [];
+        if (!client) {
+          this.remote.post({ type: "error", message: "The engine isn't running. Type /restart in the terminal." });
+          return;
+        }
+        if (client.turnRunning) {
+          if (!text.trim()) {
+            return;
+          }
+          if (images.length > 0) {
+            this.remote.post({ type: "notice", text: "Images can't be added while the agent works. Send them after the reply.", isError: true });
+            return;
+          }
+          this.print(this.formatUser(text.trim()) + from);
+          this.remote.post({ type: "userMessage", text, images: [] });
+          client.steer(text).catch((err: unknown) => {
+            fail(err);
+            if (!this.isClosed()) {
+              this.print(style.red(errorMessage(err)));
+            }
+          });
+          return;
+        }
+        if (this.state !== "idle" || this.approvals.active || this.questions.active || this.confirmState) {
+          this.remote.post({ type: "notice", text: "The terminal chat is busy (a command is running there). Try again in a moment.", isError: true });
+          return;
+        }
+        if (!text.trim() && images.length === 0) {
+          return;
+        }
+        this.write(this.editor.erase()); // what was typed in the terminal stays, for after the reply
+        await this.sendPrompt(text, { device, images });
+        return;
+      }
+      case "cancelTurn":
+        if (client?.turnRunning) {
+          this.print(style.gray(`Stopped from ${sanitize(device)}.`));
+          this.cancelTurn();
+        }
+        return;
+      case "approve": {
+        const toolCallId = String(msg.toolCallId ?? "");
+        const requestId = this.pendingApprovals.get(toolCallId);
+        if (!client || requestId === undefined) {
+          return;
+        }
+        const answer: ApprovalAnswer = { optionId: String(msg.optionId ?? ""), ...(typeof msg.reason === "string" ? { reason: msg.reason } : {}) };
+        let kind: string;
+        try {
+          kind = client.respondToApproval(requestId, answer, { onceOnly: true });
+        } catch (err) {
+          this.remote.post({ type: "notice", text: errorMessage(err) }); // still waiting
+          return;
+        }
+        const event = this.approvalDone(requestId, kind.startsWith("allow"), `from ${device}`);
+        if (event) {
+          this.approvals.resolved(event);
+        }
+        return;
+      }
+      case "answerQuestion": {
+        const toolCallId = String(msg.toolCallId ?? "");
+        const requestId = this.pendingQuestions.get(toolCallId);
+        if (!client || requestId === undefined) {
+          return;
+        }
+        const answer = typeof msg.answer === "string" ? msg.answer : undefined;
+        client.answerQuestion(requestId, answer);
+        const label = answer ? `Answered from ${device}: ${answer}` : `Skipped from ${device}.`;
+        this.questionDone(requestId, label);
+        this.questions.answered(requestId, label);
+        return;
+      }
+      case "setMode":
+        if (client) {
+          await client.setMode(String(msg.modeId ?? "")).then(() => this.print(style.gray(`Mode changed from ${sanitize(device)}.`)), fail);
+        }
+        return;
+      case "setConfig":
+        if (client) {
+          await client
+            .setConfigOption(String(msg.id ?? ""), String(msg.value ?? ""))
+            .then(() => this.print(style.gray(`${msg.id === "model" ? "Model" : "Effort"} changed from ${sanitize(device)}.`)), fail);
+        }
+        return;
+      case "getContextBreakdown":
+        if (!client) {
+          this.remote.post({ type: "contextBreakdown", error: "The engine isn't running." });
+          return;
+        }
+        try {
+          const res = await client.extMethod<{ breakdown?: unknown }>("_kiro/session/context", { subcommand: "show" });
+          this.remote.post({ type: "contextBreakdown", breakdown: res.breakdown ?? {} });
+        } catch (err) {
+          this.remote.post({ type: "contextBreakdown", error: errorMessage(err) });
+        }
+        return;
+      case "compact": {
+        if (!client || this.state !== "idle") {
+          this.remote.post({ type: "compactDone", ok: false, message: "The terminal chat is busy. Try again when it is done." });
+          return;
+        }
+        try {
+          const res = await this.runBusy("Compacting", () => client.extMethod<{ success?: boolean; message?: string }>("_kiro/session/compact"));
+          const ok = res.success !== false;
+          const message = ok ? "Conversation compacted." : (res.message ?? "Couldn't compact right now.");
+          this.remote.post({ type: "compactDone", ok, message });
+          this.print(style.gray(`${sanitize(message)} (from ${sanitize(device)})`));
+        } catch (err) {
+          this.remote.post({ type: "compactDone", ok: false, message: errorMessage(err) });
+        }
+        if (!this.isClosed()) {
+          this.showPrompt();
+        }
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
   private writeAssistant(text: string): void {
     let out = this.hideSpinner();
     if (!this.inAssistant) {
@@ -520,21 +751,25 @@ export class TerminalChat implements vscode.Pseudoterminal {
     await this.sendPrompt(text);
   }
 
-  private async sendPrompt(text: string): Promise<void> {
+  /** Send a prompt to the agent. `remote`: it came from a device (its images come with it). */
+  private async sendPrompt(text: string, remote?: { device: string; images: PromptImage[] }): Promise<void> {
     if (!this.client) {
       this.print(style.red("The engine isn't running.") + style.gray(" Type /restart."));
       this.showPrompt();
       return;
     }
-    this.print(this.formatUser(text));
-    const { images, notes } = this.loadImages(text);
-    if (this.pendingImages.length > 0) {
+    this.print(this.formatUser(text) + (remote ? style.gray(`  (from ${sanitize(remote.device)})`) : ""));
+    const { images, notes } = remote
+      ? { images: [...remote.images], notes: remote.images.length ? [style.gray(`  📎 ${remote.images.length === 1 ? "an image" : `${remote.images.length} images`}`)] : [] }
+      : this.loadImages(text);
+    if (!remote && this.pendingImages.length > 0) {
       images.push(...this.pendingImages.splice(0));
       notes.push(style.gray("  📎 attached clipboard image"));
     }
     for (const n of notes) {
       this.print(n);
     }
+    this.remote.post({ type: "userMessage", text, images });
     this.transcript.push({ role: "user", text });
     this.currentPrompt = text;
     this.lastTurn = undefined;
@@ -665,6 +900,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
     this.editor.addHistory(text);
     this.editor.clear();
     this.print(this.formatUser(text.trim()));
+    this.remote.post({ type: "userMessage", text: text.trim(), images: [] });
     client.steer(text).catch((err) => {
       if (!this.isClosed()) {
         this.print(style.red(errorMessage(err)));
@@ -710,6 +946,9 @@ export class TerminalChat implements vscode.Pseudoterminal {
     this.client = undefined;
     this.approvals.clear();
     this.questions.clear();
+    this.pendingApprovals.clear();
+    this.pendingQuestions.clear();
+    this.remote.post({ type: "cleared" }); // a new engine starts a new conversation
     this.config.clear();
     this.usagePct = undefined;
     this.updatePrompt();
@@ -822,6 +1061,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
   private resetConversationState(): void {
     this.transcript = [];
     this.userTurns = [];
+    this.remote.post({ type: "cleared" });
     this.usagePct = undefined;
     this.updatePrompt();
   }
@@ -845,11 +1085,13 @@ export class TerminalChat implements vscode.Pseudoterminal {
       this.transcript = this.transcript.slice(0, cut);
     }
     this.userTurns = this.userTurns.slice(0, index);
+    this.remote.post({ type: "notice", text: "The conversation was rewound in the terminal. Messages after that point are no longer part of it." });
   }
 
   private setTitle(title: string | undefined): void {
     this.customTitle = title;
     this.nameEmitter.fire(title ? `Kiro: ${title}` : this.name);
+    this.options.remote?.changed();
   }
 
   private makeHost(): ChatHost {

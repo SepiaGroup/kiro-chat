@@ -286,7 +286,8 @@ function handleEvent(ev: ChatEventLike): void {
     case "questionResolved":
       // Cancelled, or the turn ended before it was answered.
       if (removeQuestionCard(String(ev.toolCallId ?? ""))) {
-        addSystem("The question was cancelled.", "");
+        // `label`: answered in another chat screen (a terminal chat says where).
+        addSystem(typeof ev.label === "string" ? ev.label : "The question was cancelled.", "");
       }
       break;
     case "availableCommands":

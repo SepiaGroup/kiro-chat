@@ -118,3 +118,16 @@ test("without an engine to answer, the question is dropped with a note", () => {
   assert.equal(s.p.active, false);
   assert.match(s.printed.at(-1) ?? "", /Can't answer this question/);
 });
+
+test("a question answered from a phone leaves the screen, and a queued one shows", () => {
+  const s = setup();
+  s.p.enqueue(Q, 1);
+  s.p.enqueue({ ...Q, question: "Second" }, 2);
+  s.keys("r", "e");
+  s.p.answered(1, "Answered from iPhone: red");
+  assert.ok(s.printed.includes("  Answered from iPhone: red"));
+  assert.match(s.printed.at(-1) ?? "", /^\? Second/);
+  s.p.answered(9, "unknown");
+  assert.ok(!s.printed.includes("  unknown"));
+  assert.deepEqual(s.answers, []);
+});
