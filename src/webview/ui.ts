@@ -41,6 +41,11 @@ export function scrollToBottom(): void {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+/** Scrolled to the end (or nearly): new content should keep it there. False when the user scrolled up to read. */
+export function isAtBottom(el: HTMLElement = messagesEl): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+}
+
 /** A system line in the chat (notices and errors). */
 export function addSystem(text: string, cls = ""): void {
   const el = div("msg system " + cls);

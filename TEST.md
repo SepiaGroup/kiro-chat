@@ -70,6 +70,7 @@ Then run **Developer: Reload Window**.
 ### Chatting
 - [ ] Replies stream as markdown (see `docs/samples/` for test content); code blocks have Copy.
 - [ ] A reply that writes, runs a tool, then writes again shows the later text below the tool card, not in the bubble above it.
+- [ ] Ask for a command with long output (`find . -name '*.ts'`). The chat stays at the bottom as the card fills in, and the output box shows the end of the output. Scrolled up in the chat (or in the box) while it runs, it stays where you are. Same on the phone.
 - [ ] The input starts one row high and grows with content up to 200px.
 - [ ] Enter sends, Shift+Enter adds a line; with `enterToSend` off they swap.
 - [ ] `/` opens the command picker with engine commands, agents and skills.
