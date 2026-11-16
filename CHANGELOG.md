@@ -5,6 +5,7 @@
 First release.
 
 - `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
+- Fixed: the chat didn't follow a tool card as it grew, and a command's output box showed the start of the output instead of the end.
 - Remote access shows terminal chats too: watch them, prompt, stop, and answer approvals and questions from the phone.
 - Fixed: a prompt from the phone to a chat in another window said "Not sent" when the reply took more than a few seconds.
 - Rename a chat tab or the panel chat with `/title <name>` or **Rename Chat…** (Command Palette or the tab's right-click menu). The name is kept after a reload and shown on a remote device.

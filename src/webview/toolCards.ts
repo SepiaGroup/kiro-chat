@@ -3,7 +3,7 @@
 
 import { formatElapsed } from "../format";
 import { diffLines } from "./lineDiff";
-import { div, messagesEl, scrollToBottom } from "./ui";
+import { div, isAtBottom, messagesEl, scrollToBottom } from "./ui";
 
 export interface ChatEventLike {
   kind: string;
@@ -138,6 +138,8 @@ export function updateToolCard(ev: ChatEventLike): void {
   if (!card) {
     return;
   }
+  // The card grows (output, diff, status): keep the chat at the end unless the user scrolled up.
+  const follow = isAtBottom();
   const diff = ev.diff as DiffLike | undefined;
   if (diff) {
     renderToolDiff(card, diff, ev.startLine as number | undefined);
@@ -150,13 +152,22 @@ export function updateToolCard(ev: ChatEventLike): void {
       pre.className = "tool-output";
       card.appendChild(pre);
     }
-    pre.textContent = truncate(output, 4000);
+    // A command's output box shows its end, like a terminal, unless the user scrolled up in it.
+    const followOutput = pre.textContent === "" || isAtBottom(pre);
+    pre.textContent = lastPart(output, 4000);
+    if (followOutput) {
+      pre.scrollTop = pre.scrollHeight;
+    }
   }
   if (ev.status) {
     setToolStatus(card, id, String(ev.status));
   }
+  if (follow) {
+    scrollToBottom();
+  }
 }
 
-function truncate(s: string, n: number): string {
-  return s.length > n ? s.slice(0, n) + "\n…(truncated)" : s;
+/** The end of a long output: that is where a command says how it went. */
+function lastPart(s: string, n: number): string {
+  return s.length > n ? "…(start cut)\n" + s.slice(-n) : s;
 }
