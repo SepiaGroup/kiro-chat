@@ -245,6 +245,7 @@ export class RemoteController implements vscode.Disposable {
       return;
     }
     this.ticking = true;
+    this.terminals.checkTitles(); // a terminal renamed from its tab: no event says so
     try {
       this.publishSelf(); // also puts the file back if it was removed
       const hub = registry.hub();

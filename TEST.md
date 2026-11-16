@@ -131,7 +131,7 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] Restart VS Code: remote access is off unless `kiroCliChat.remote.autoStart` is on; paired devices are still paired.
 
 ### Remote access (terminal chat)
-- [ ] Open a terminal chat with remote access on: the browser's chat list shows "Kiro Chat (terminal)" without a reload, with what the terminal has shown so far. `/title Build` renames it there. Closing the terminal removes it from the list.
+- [ ] Open a terminal chat with remote access on: the browser's chat list shows "Kiro Chat (terminal)" without a reload, with what the terminal has shown so far. `/title Build` renames it there, and so does **Rename** on the terminal's tab (within a few seconds). Closing the terminal removes it from the list.
 - [ ] Send a prompt from the browser: the terminal shows it with "(from <browser>)" and the reply streams in both. Text typed in the terminal before stays and is back after the reply. Stop from the browser ends the reply ("Stopped from …").
 - [ ] Autopilot off, a command that needs approval: Allow in the browser and the terminal prints "✓ Allowed from <browser>" and goes on (also with the terminal's reason input open). Answer one with `y` in the terminal: the browser's card goes, with "Allowed in the terminal". A rule button in the browser is refused and the terminal still waits.
 - [ ] A question answered in the browser: the terminal prints "Answered from …" and goes on. Answered in the terminal: the browser's card goes with "Answered in the terminal."

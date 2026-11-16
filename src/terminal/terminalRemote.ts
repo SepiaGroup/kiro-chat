@@ -63,6 +63,8 @@ export class TerminalRemote implements RemoteChat {
 export class TerminalChats {
   private readonly list = new Set<TerminalRemote>();
   private readonly listeners = new Set<() => void>();
+  /** The titles last listed, to notice a rename nothing announces. */
+  private titles = "";
 
   /** List a chat; returns the way to take it off. */
   add(chat: TerminalRemote): () => void {
@@ -79,8 +81,23 @@ export class TerminalChats {
     return [...this.list];
   }
 
+  /**
+   * Announce the list again if a title changed. VS Code renames a terminal
+   * (its tab's Rename) without an event, so remote access calls this on its tick.
+   */
+  checkTitles(): void {
+    if (this.currentTitles() !== this.titles) {
+      this.changed();
+    }
+  }
+
+  private currentTitles(): string {
+    return JSON.stringify(this.chats().map((c) => c.title));
+  }
+
   /** The list, a title or a busy state changed. */
   changed(): void {
+    this.titles = this.currentTitles();
     for (const l of [...this.listeners]) {
       l();
     }

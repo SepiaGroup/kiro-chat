@@ -150,7 +150,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
       },
     });
     this.remote = new TerminalRemote({
-      title: () => `${this.customTitle ?? this.name} (terminal)`,
+      title: () => `${this.shownName()} (terminal)`,
       busy: () => this.client?.turnRunning ?? false,
       handle: (msg, device) => this.fromRemote(msg, device),
     });
@@ -1086,6 +1086,12 @@ export class TerminalChat implements vscode.Pseudoterminal {
     }
     this.userTurns = this.userTurns.slice(0, index);
     this.remote.post({ type: "notice", text: "The conversation was rewound in the terminal. Messages after that point are no longer part of it." });
+  }
+
+  /** The name on the terminal's tab: a Rename there wins, as it does in VS Code. */
+  private shownName(): string {
+    const tab = vscode.window.terminals?.find((t) => (t.creationOptions as vscode.ExtensionTerminalOptions).pty === this);
+    return tab?.name || (this.customTitle ? `Kiro: ${this.customTitle}` : this.name);
   }
 
   private setTitle(title: string | undefined): void {

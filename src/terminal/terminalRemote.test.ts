@@ -65,3 +65,17 @@ test("the terminal list: added, taken off once, and changes announced", () => {
   chats.changed();
   assert.equal(changes, 3);
 });
+
+test("a rename nothing announced is found by checkTitles, once", () => {
+  const chats = new TerminalChats();
+  let changes = 0;
+  chats.onDidChangeChats(() => changes++);
+  const r = rig();
+  chats.add(r.remote);
+  chats.checkTitles();
+  assert.equal(changes, 1, "no change, no announcement");
+  r.state.title = "Renamed (terminal)";
+  chats.checkTitles();
+  chats.checkTitles();
+  assert.equal(changes, 2);
+});
