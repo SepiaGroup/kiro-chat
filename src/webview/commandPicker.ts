@@ -15,15 +15,25 @@ const pickerEl = byId("cmd-picker");
 const hintEl = byId("cmd-hint");
 
 // The tab's own commands (the terminal chat's, see webCommands.ts); the engine
-// adds agents and skills. A remote device's lines all go to the agent as text,
-// so the remote page offers only the engine's.
-const BUILTIN_COMMANDS: CommandLike[] = document.body.classList.contains("remote-page") ? [] : tabCommandList();
+// adds agents and skills. A terminal chat shown on a remote page takes every
+// line as text for the agent, so there the page offers only the engine's.
+const remotePage = document.body.classList.contains("remote-page");
+let BUILTIN_COMMANDS: CommandLike[] = remotePage ? [] : tabCommandList();
+let engineCommands: CommandLike[] = [];
 
 let allCommands: CommandLike[] = [...BUILTIN_COMMANDS];
+
+/** The chat shown runs "/" commands (a chat tab) or not (a terminal chat on a remote page). */
+export function setSlashChat(on: boolean): void {
+  document.body.classList.toggle("slash-chat", on);
+  BUILTIN_COMMANDS = on ? tabCommandList(remotePage) : [];
+  setCommands(engineCommands);
+}
 let pickerMatches: CommandLike[] = [];
 let pickerIndex = 0;
 
 export function setCommands(cmds: CommandLike[]): void {
+  engineCommands = cmds;
   // Merge engine-provided commands with built-ins, de-duplicating by name.
   const byName = new Map<string, CommandLike>();
   for (const c of BUILTIN_COMMANDS) {

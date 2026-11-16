@@ -211,6 +211,11 @@ export class RemoteActions {
       case "setConfig":
         if (engine) {
           const id = String(msg.id ?? "");
+          if (!CONFIG_NAMES[id]) {
+            // The policy lets a chat tab's page change more (Autopilot, memory); a terminal chat keeps its own.
+            host.post({ type: "notice", text: "That setting can be changed in the terminal chat only (/set).", isError: true });
+            return;
+          }
           await engine
             .setConfigOption(id, String(msg.value ?? ""))
             .then(() => host.print(style.gray(`${CONFIG_NAMES[id] ?? sanitize(id)} changed from ${sanitize(device)}.`)), fail);

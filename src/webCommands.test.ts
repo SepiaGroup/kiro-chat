@@ -40,3 +40,16 @@ test("the picker lists only what runs here; help lists the agent's commands too"
   assert.match(help, /\/context-gatherer +Gathers context/);
   assert.doesNotMatch(help, /^ +\/paste/m);
 });
+
+test("a remote device is told about the three commands that act on the Mac's screen", () => {
+  for (const n of ["copy", "login", "remote"]) {
+    const r = routeSlash("/" + n, engine, true);
+    assert.equal(r.kind, "unavailable", n);
+    assert.equal(routeSlash("/" + n, engine, false).kind, "run", n);
+    assert.ok(!tabCommandList(true).some((c) => c.name === n), n);
+    assert.ok(tabCommandList(false).some((c) => c.name === n), n);
+  }
+  assert.equal(routeSlash("/autopilot on", engine, true).kind, "run");
+  assert.equal(routeSlash("/tools trust-all", engine, true).kind, "run");
+  assert.doesNotMatch(stripAnsi(tabHelp(engine, true)), /^ +\/copy/m);
+});

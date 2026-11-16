@@ -48,9 +48,15 @@ export function addCommandOutput(run: number, segments: Segment[]): void {
   }
 }
 
+/** Someone answered on another screen: drop this one's question. */
+export function dropConfirm(id: number): void {
+  messagesEl.querySelector(`.cmd-confirm[data-id="${id}"]`)?.remove();
+}
+
 /** A command asks Yes or No (Esc or No: no). */
 export function askConfirm(id: number, question: string): void {
   const card = div("cmd-confirm");
+  card.dataset.id = String(id);
   card.setAttribute("role", "group");
   card.setAttribute("aria-label", question);
   const q = div("cmd-confirm-q");

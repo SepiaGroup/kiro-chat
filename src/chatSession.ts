@@ -105,9 +105,10 @@ export class ChatSession implements RemoteChat {
     updatePrompt: () => undefined,
     resetConversationState: () => this.conv.reset(),
     newConversation: () => this.newSession(),
-    restart: () => this.confirmRestart(),
+    restart: () => (this.commandOrigin.kind === "remote" ? this.confirmRestartOnPage(this.commandOrigin.device) : this.confirmRestart()),
     login: () => this.runLogin(),
     remoteAccess: async (action) => {
+      // Not run for a remote device (routeSlash tells it so); this is the Mac's own.
       const id = { start: "startRemoteAccess", link: "showRemoteLink", stop: "stopRemoteAccess" }[action];
       const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroCliChat.${id}`);
       return action === "stop" || result === true;
@@ -118,6 +119,8 @@ export class ChatSession implements RemoteChat {
   /** The command whose card output goes to; a command runs one at a time. */
   private commandRun = 0;
   private commandBusy = false;
+  /** Who typed the command that is running (a restart asks them, not the Mac). */
+  private commandOrigin: MessageOrigin = { kind: "desktop" };
   /** y/n questions a command asked (`/knowledge clear`, an existing file in `/chat save`). */
   private readonly confirms = new Map<number, (yes: boolean) => void>();
   private cancelRequested = false;
@@ -224,7 +227,7 @@ export class ChatSession implements RemoteChat {
 
   /** `/title`, `/title <name>`, `/title clear`: true if `text` was one. */
   private async titleCommand(text: string): Promise<boolean> {
-    const m = /^\/title(?:\s+([\s\S]*))?$/i.exec(text.trim());
+    const m = /^\/title(?:\s+([\s\S]*))?$/i.exec(text.trimEnd());
     if (!m) {
       return false;
     }
@@ -243,16 +246,18 @@ export class ChatSession implements RemoteChat {
 
   /**
    * A slash command typed in this tab. It runs the terminal chat's code; what
-   * it prints shows in a card under the command. Only this tab sees it (not
-   * recorded, not sent to remote devices).
+   * it prints shows in a card under the command, on every screen of this chat
+   * (the Mac's tab and remote pages), not kept after a reload. A remote
+   * device's commands run too, except the few that act on the Mac's screen.
    */
-  private async runSlash(route: Exclude<SlashRoute, { kind: "agent" }>, images: number): Promise<void> {
+  private async runSlash(route: Exclude<SlashRoute, { kind: "agent" }>, images: number, origin: MessageOrigin): Promise<void> {
     if (this.commandBusy) {
       this.post({ type: "notice", text: "A command is still running. Try again when it is done.", isError: true });
       return;
     }
     const run = ++this.commandRun;
-    this.targets.postToDesktop({ type: "commandStart", run, text: route.text });
+    this.commandOrigin = origin;
+    this.commandPost({ type: "commandStart", run, text: route.text + (origin.kind === "remote" ? `  (from ${origin.device})` : "") });
     if (route.kind === "unknown") {
       this.commandPrint(style.yellow(`Unknown command /${route.name}.`) + style.gray(" Type /help to see commands (start with a space to send it to the agent as text)."));
       return;
@@ -270,8 +275,11 @@ export class ChatSession implements RemoteChat {
       return;
     }
     if (route.name === "resume" || (route.name === "chat" && sub === "load")) {
-      this.openResumePanel();
-      this.commandPrint(style.gray("Pick a session in the Resume panel."));
+      // The panel opens on the Mac's own page; a remote page has its own Resume button.
+      if (origin.kind === "desktop") {
+        this.openResumePanel();
+      }
+      this.commandPrint(style.gray(origin.kind === "desktop" ? "Pick a session in the Resume panel." : "Use the Resume button in the toolbar."));
       return;
     }
     this.commandBusy = true;
@@ -289,7 +297,17 @@ export class ChatSession implements RemoteChat {
 
   /** A line from a command, into its card. */
   private commandPrint(text: string): void {
-    this.targets.postToDesktop({ type: "commandOutput", run: this.commandRun, segments: ansiSegments(text) });
+    this.commandPost({ type: "commandOutput", run: this.commandRun, segments: ansiSegments(text) });
+  }
+
+  /**
+   * Show something of a command on every screen of this chat (the Mac's tab
+   * and the remote pages, which share one stream, so one device can't be
+   * singled out). Not recorded in the transcript: a reload doesn't show it.
+   */
+  private commandPost(msg: unknown): boolean {
+    this.targets.broadcast(msg);
+    return this.targets.size > 0;
   }
 
   /** What the terminal chat's command code needs, from this tab. */
@@ -303,11 +321,11 @@ export class ChatSession implements RemoteChat {
         return this.transport.client;
       },
       runBusy: async (label, fn) => {
-        this.targets.postToDesktop({ type: "status", text: `${label}…` });
+        this.commandPost({ type: "status", text: `${label}…` });
         try {
           return await fn();
         } finally {
-          this.targets.postToDesktop({ type: "status", text: "" });
+          this.commandPost({ type: "status", text: "" });
         }
       },
       confirm: (question) =>
@@ -315,7 +333,7 @@ export class ChatSession implements RemoteChat {
           const id = this.commandRun;
           this.confirms.get(id)?.(false);
           this.confirms.set(id, resolve);
-          if (!this.targets.postToDesktop({ type: "confirm", id, question })) {
+          if (!this.commandPost({ type: "confirm", id, question })) {
             this.confirms.delete(id);
             resolve(false);
           }
@@ -331,7 +349,7 @@ export class ChatSession implements RemoteChat {
       userTurns: () => this.conv.userTurns,
       turnStats: () => this.conv.turnStats,
       mcpServers: () => this.conv.mcpServers,
-      setInput: (text) => this.targets.postToDesktop({ type: "setInput", text }),
+      setInput: (text) => this.targets.postToDesktop({ type: "setInput", text }), // the Mac's box only
       addPendingImage: () => undefined, // /paste is terminal only
       setTitle: (t) => this.rename(t),
       title: () => this.title,
@@ -429,14 +447,12 @@ export class ChatSession implements RemoteChat {
         break;
       case "sendPrompt": {
         const text = String(msg.text ?? "");
-        // A remote device's "/title" goes to the agent as text, as everything it types does in a terminal chat.
-        if (origin.kind === "desktop" && (await this.titleCommand(text))) {
+        if (await this.titleCommand(text)) {
           break;
         }
-        // A remote device's lines go to the agent as typed (it may not change settings or open things here).
-        const route: SlashRoute = origin.kind === "desktop" ? routeSlash(text, this.conv.engineCommands) : { kind: "agent" };
+        const route: SlashRoute = routeSlash(text, this.conv.engineCommands, origin.kind === "remote");
         if (route.kind !== "agent") {
-          await this.runSlash(route, sanitizeImages(msg.images).length);
+          await this.runSlash(route, sanitizeImages(msg.images).length, origin);
           break;
         }
         if (this.commandBusy) {
@@ -462,9 +478,11 @@ export class ChatSession implements RemoteChat {
         );
         break;
       case "confirmAnswer": {
-        const resolve = origin.kind === "desktop" ? this.confirms.get(Number(msg.id)) : undefined;
+        // Any screen of this chat may answer; the first answer counts.
+        const resolve = this.confirms.get(Number(msg.id));
         this.confirms.delete(Number(msg.id));
         resolve?.(msg.yes === true);
+        this.commandPost({ type: "confirmDone", id: Number(msg.id) }); // the other screens drop their card
         break;
       }
       case "steerPrompt":
@@ -483,7 +501,8 @@ export class ChatSession implements RemoteChat {
         await this.loadSessionById(String(msg.sessionId ?? ""));
         break;
       case "restart":
-        await this.confirmRestart();
+        // The Mac asks in a VS Code dialog; a remote device is asked on its own page, not on the Mac.
+        await (origin.kind === "remote" ? this.confirmRestartOnPage(origin.device) : this.confirmRestart());
         break;
       case "newTab":
         this.hooks.newTab();
@@ -637,11 +656,10 @@ export class ChatSession implements RemoteChat {
     }
     let kind: string;
     try {
-      kind = this.transport.client.respondToApproval(requestId, answer, { onceOnly: remote });
+      kind = this.transport.client.respondToApproval(requestId, answer);
     } catch (err) {
-      // A folder rule with an invalid folder (the webview checks it first), or a
-      // remote device asking for more than allow or deny once. Still waiting.
-      this.post(remote ? { type: "notice", text: errorMessage(err) } : { type: "error", message: errorMessage(err) });
+      // A folder rule with an invalid folder (the webview checks it first). Still waiting.
+      this.post(remote ? { type: "notice", text: errorMessage(err), isError: true } : { type: "error", message: errorMessage(err) });
       return;
     }
     this.transcript.dropApprovalCard(toolCallId);
@@ -839,6 +857,7 @@ export class ChatSession implements RemoteChat {
         mode: cfg.interactionMode,
         autopilot: cfg.autopilot,
         enterToSend: cfg.enterToSend,
+        slash: true, // this chat runs "/" commands (a terminal chat's page doesn't get this)
       });
     } catch (err) {
       this.post({ type: "fatal", message: errorMessage(err) });
@@ -1012,6 +1031,24 @@ export class ChatSession implements RemoteChat {
     }
     this.post({ type: "restarting" });
     await this.restart();
+  }
+
+  /** Restart asked from a remote device: the question goes to the chat's pages, not to a dialog on the Mac. */
+  private async confirmRestartOnPage(device: string): Promise<void> {
+    this.commandOrigin = { kind: "remote", device };
+    const run = ++this.commandRun;
+    const yes = await new Promise<boolean>((resolve) => {
+      this.confirms.get(run)?.(false);
+      this.confirms.set(run, resolve);
+      if (!this.commandPost({ type: "confirm", id: run, question: "Restart the Kiro engine and start a new session? This clears the chat and stops a reply in progress." })) {
+        this.confirms.delete(run);
+        resolve(false);
+      }
+    });
+    if (yes) {
+      this.post({ type: "restarting" });
+      await this.restart();
+    }
   }
 
   async restart(): Promise<void> {

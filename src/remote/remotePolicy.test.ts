@@ -23,13 +23,10 @@ test("bad shapes are refused", () => {
 });
 
 test("only the listed message types get through", () => {
+  // These act on the Mac's own screen, so no device may send them.
   for (const type of [
     "login",
-    "newTab",
-    "restart",
     "newSession",
-    "resumeSession",
-    "loadSession",
     "pickAttachment",
     "attachPaths",
     "debugLog",
@@ -42,6 +39,17 @@ test("only the listed message types get through", () => {
   ]) {
     refused({ type }, 403);
   }
+  // A paired device may restart, open a tab, resume, load a session and answer a command's y/n question.
+  assert.deepEqual(ok({ type: "restart" }), { type: "restart" });
+  assert.deepEqual(ok({ type: "newTab" }), { type: "newTab" });
+  assert.deepEqual(ok({ type: "resumeSession" }), { type: "resumeSession" });
+  assert.deepEqual(ok({ type: "loadSession", sessionId: "s1" }), { type: "loadSession", sessionId: "s1" });
+  refused({ type: "loadSession" }, 400);
+  assert.deepEqual(ok({ type: "confirmAnswer", id: 3, yes: true }), { type: "confirmAnswer", id: 3, yes: true });
+  assert.deepEqual(ok({ type: "confirmAnswer", id: 4, yes: "x" }), { type: "confirmAnswer", id: 4, yes: false });
+  refused({ type: "confirmAnswer", yes: true }, 400);
+  refused({ type: "restart" }, 403, ["view"]);
+  refused({ type: "confirmAnswer", id: 1 }, 403, ["view"]);
 });
 
 test("view, prompt and approve are separate permissions", () => {
@@ -61,17 +69,17 @@ test("parsePermissions keeps the known ones and defaults to all", () => {
   assert.deepEqual(parsePermissions([]), []);
 });
 
-test("an approval keeps the answer and the reason but never a rule or folder", () => {
+test("an approval keeps the answer, reason, rule and folder", () => {
   const m = ok({
     type: "approve",
     toolCallId: "t1",
     optionId: "reject_once",
     reason: "no thanks",
     rule: "entire-tool",
-    folder: "/",
+    folder: "/tmp",
     extra: true,
   });
-  assert.deepEqual(m, { type: "approve", toolCallId: "t1", optionId: "reject_once", reason: "no thanks" });
+  assert.deepEqual(m, { type: "approve", toolCallId: "t1", optionId: "reject_once", reason: "no thanks", rule: "entire-tool", folder: "/tmp" });
   refused({ type: "approve", optionId: "allow_once" }, 400);
   refused({ type: "approve", toolCallId: "t", optionId: "" }, 400);
   refused({ type: "approve", toolCallId: "t".repeat(300), optionId: "a" }, 400);
@@ -101,9 +109,13 @@ test("steering, answers, mode and settings", () => {
   refused({ type: "setMode" }, 400);
   assert.deepEqual(ok({ type: "setConfig", id: "model", value: "auto" }), { type: "setConfig", id: "model", value: "auto" });
   assert.deepEqual(ok({ type: "setConfig", id: "effortLevel", value: "high" }), { type: "setConfig", id: "effortLevel", value: "high" });
-  for (const id of ["autopilot", "memoryReflection", "contentCollection", "anything"]) {
-    refused({ type: "setConfig", id, value: "on" }, 403);
+  // A device may change the Settings-panel options; autopilot also needs the approve permission.
+  for (const id of ["memoryReflection", "contentCollection"]) {
+    assert.deepEqual(ok({ type: "setConfig", id, value: "on" }), { type: "setConfig", id, value: "on" });
   }
+  assert.deepEqual(ok({ type: "setConfig", id: "autopilot", value: "on" }), { type: "setConfig", id: "autopilot", value: "on" });
+  refused({ type: "setConfig", id: "autopilot", value: "on" }, 403, ["view", "prompt"]);
+  refused({ type: "setConfig", id: "anything", value: "on" }, 403);
   refused({ type: "setConfig", id: "model" }, 400);
 });
 

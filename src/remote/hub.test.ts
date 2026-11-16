@@ -223,14 +223,14 @@ test("a message from the phone reaches the chat in the other window, with the de
     const denied = await request(r.hubPort, "POST", "/api/chats/aaaaaaaa.m2/message", { headers: { Cookie: r.cookie }, json: { type: "sendPrompt", text: "no" } });
     assert.equal(denied.status, 403);
     assert.equal(r.memberChats[1].sent.length, 1);
-    // An approval arrives without any rule a phone tried to attach.
+    // An approval with a rule and folder now passes through to the other window.
     r.perms.current = ["view", "prompt", "approve"];
     const approve = await request(r.hubPort, "POST", "/api/chats/aaaaaaaa.m2/message", {
       headers: { Cookie: r.cookie },
-      json: { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "always", folder: "/" },
+      json: { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "entire-tool", folder: "/tmp" },
     });
     assert.equal(approve.status, 204, approve.body);
-    assert.deepEqual(r.memberChats[1].sent[1].msg, { type: "approve", toolCallId: "t1", optionId: "allow_once" });
+    assert.deepEqual(r.memberChats[1].sent[1].msg, { type: "approve", toolCallId: "t1", optionId: "allow_once", rule: "entire-tool", folder: "/tmp" });
   } finally {
     await r.stop();
   }

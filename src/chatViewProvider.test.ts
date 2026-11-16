@@ -436,13 +436,27 @@ test("slash commands in a tab run the terminal chat's code, not a prompt", async
   t.chat.transport = undefined;
 });
 
-test("the agent's own commands and a remote device's lines go to the agent", async () => {
+test("the agent's own commands go to the agent; a remote device runs commands too, except the ones for the Mac", async () => {
   const t = await commandTab();
   t.chat.conv.engineCommands = [{ name: "context-gatherer" }];
   await t.say("/context-gatherer look");
+  assert.deepEqual(t.prompts, ["/context-gatherer look"]);
+  // A remote device's command runs, and its output reaches every screen, naming the device.
+  const seen: Array<Record<string, unknown>> = [];
+  const stop = t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
   await t.chat.send({ type: "sendPrompt", text: "/usage", images: [] }, { id: "d", name: "iPhone" });
-  assert.deepEqual(t.prompts, ["/context-gatherer look", "/usage"]);
-  assert.deepEqual(t.calls, []);
+  assert.deepEqual(t.calls.map((c) => c[0]), ["_kiro/account/getUsage"]);
+  assert.deepEqual(t.prompts, ["/context-gatherer look"]);
+  assert.equal(seen.find((m) => m.type === "commandStart")?.text, "/usage  (from iPhone)");
+  assert.ok(seen.some((m) => m.type === "commandOutput"));
+  assert.ok(t.tab.webview.sent.some((m) => m.type === "commandOutput"), "the Mac's tab shows it too");
+  // The Mac's own screen: /copy and /remote say why not.
+  await t.chat.send({ type: "sendPrompt", text: "/copy", images: [] }, { id: "d", name: "iPhone" });
+  await t.chat.send({ type: "sendPrompt", text: "/remote stop", images: [] }, { id: "d", name: "iPhone" });
+  const text = seen.filter((m) => m.type === "commandOutput").map((m) => (m.segments as Array<{ text: string }>).map((s) => s.text).join("")).join("\n");
+  assert.match(text, /clipboard/);
+  assert.match(text, /cut this device off/);
+  stop();
   t.chat.transport = undefined;
 });
 
@@ -456,5 +470,32 @@ test("a command's Yes/No question waits for the tab's answer", async () => {
   await tick();
   await tick();
   assert.deepEqual(t.calls.map((c) => c[0]), ["_kiro/knowledge"]);
+  t.chat.transport = undefined;
+});
+
+test("a remote device's restart is asked on its page, not in a dialog on the Mac; its approval may carry a rule", async () => {
+  const t = await commandTab();
+  const seen: Array<Record<string, unknown>> = [];
+  t.chat.subscribe((m: Record<string, unknown>) => seen.push(m));
+  let restarted = 0;
+  t.chat.restart = async () => void restarted++;
+  const done = t.chat.send({ type: "restart" }, { id: "d", name: "iPhone" });
+  await tick();
+  const ask = seen.find((m) => m.type === "confirm");
+  assert.match(String(ask?.question), /Restart the Kiro engine/);
+  assert.equal(restarted, 0, "waits for the answer");
+  await t.chat.send({ type: "confirmAnswer", id: ask?.id, yes: true }, { id: "d", name: "iPhone" });
+  await done;
+  assert.equal(restarted, 1);
+  assert.ok(seen.some((m) => m.type === "confirmDone" && m.id === ask?.id), "the other screens drop the question");
+  assert.ok(seen.some((m) => m.type === "restarting"));
+
+  // An approval with a rule is passed to the engine as it is, from a remote device too.
+  const answers: unknown[][] = [];
+  t.chat.transport = { mode: "persistent", client: { respondToApproval: (...a: unknown[]) => (answers.push(a), "allow_always") } };
+  t.chat.pendingApprovals.set("tc1", "req1");
+  await t.chat.send({ type: "approve", toolCallId: "tc1", optionId: "allow_always", rule: "tool" }, { id: "d", name: "iPhone" });
+  assert.deepEqual(answers, [["req1", { optionId: "allow_always", rule: "tool" }]]);
+  assert.ok(seen.some((m) => (m.event as { label?: string } | undefined)?.label === "Allowed from iPhone"));
   t.chat.transport = undefined;
 });

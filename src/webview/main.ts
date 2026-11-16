@@ -7,10 +7,10 @@ import type { ApprovalRequest, Question } from "../types";
 import { removeAllApprovalCards, removeApprovalCard, renderApproval } from "./approvalCard";
 import { removeQuestionCard, renderQuestion } from "./questionCard";
 import { showSteer } from "./steerNotes";
-import { addCommandOutput, askConfirm, startCommandCard } from "./commandCard";
+import { addCommandOutput, askConfirm, dropConfirm, startCommandCard } from "./commandCard";
 import type { Segment } from "../ansiSegments";
 import { clearAttachments, currentAttachments, initDropAndPaste, insertPaths, pushAttachment } from "./attachments";
-import { CommandLike, handlePickerKeydown, hideHint, hidePicker, setCommands, updateHint, updatePicker } from "./commandPicker";
+import { CommandLike, handlePickerKeydown, hideHint, hidePicker, setCommands, setSlashChat, updateHint, updatePicker } from "./commandPicker";
 import {
   addCredits,
   compactDone,
@@ -165,6 +165,8 @@ window.addEventListener("message", (e: MessageEvent) => {
       break;
     case "ready":
       state.enterToSend = Boolean(msg.enterToSend ?? true);
+      // Only a chat tab runs "/" commands and takes rules, Autopilot and Restart from a remote page.
+      setSlashChat(msg.slash === true);
       setAutopilotChecked(Boolean(msg.autopilot));
       setStarting(false);
       setStatus("");
@@ -201,6 +203,9 @@ window.addEventListener("message", (e: MessageEvent) => {
       break;
     case "confirm":
       askConfirm(Number(msg.id), String(msg.question ?? ""));
+      break;
+    case "confirmDone":
+      dropConfirm(Number(msg.id));
       break;
     case "setInput":
       inputEl.value = String(msg.text ?? "");

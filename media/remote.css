@@ -123,11 +123,12 @@ html {
   min-width: 0;
 }
 
-/* What only works at the desktop: not offered here (the server refuses it too). */
-.remote-page #btn-resume,
-.remote-page #btn-restart,
-.remote-page #btn-new-tab,
-.remote-page .settings-desktop {
+/* A terminal chat takes none of these from a remote device (the page's body gets
+   "slash-chat" for a chat tab, which takes them). */
+.remote-page:not(.slash-chat) #btn-resume,
+.remote-page:not(.slash-chat) #btn-restart,
+.remote-page:not(.slash-chat) #btn-new-tab,
+.remote-page:not(.slash-chat) .settings-desktop {
   display: none !important;
 }
 

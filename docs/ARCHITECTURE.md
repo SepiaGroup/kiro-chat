@@ -129,7 +129,8 @@ module.
    and keeps the tab numbering right. `ChatSessionHooks.renamed` sets
    `WebviewPanel.title` or `WebviewView.title`; `changed` updates the remote
    list; `_kiro/session/rename` renames the session for Resume. Only the
-   desktop's `/title` renames: a remote device's goes to the agent.
+   `/title` renames from a chat tab's page or a remote page (a terminal chat's
+   phone sends it to the agent).
    The tab's right-click menu has Rename Chat on every webview tab
    (`resourceScheme == webview-panel`): VS Code 1.98 sets no context key with
    the clicked tab's view type. The command gets `{ groupId, editorIndex }`;
@@ -151,10 +152,19 @@ Slash commands typed in a tab run the terminal chat's code
 terminal chat does and lists the commands a tab runs (the picker uses the same
 list). `conversationLog.ts` (pure) keeps what the commands read (settings,
 engine commands, tool groups, MCP servers, transcript, turn stats).
-`print()` goes to the tab only, as `commandOutput` with the ANSI colors turned
-into style names (`ansiSegments.ts`, pure), and is not recorded; a command's
-y/n question is a `confirm` / `confirmAnswer` pair. Lines from a remote device
-are never run as commands.
+`print()` goes to every screen of the chat (the tab and the remote pages, which
+share one stream per chat, so one device cannot be singled out), as
+`commandOutput` with the ANSI colors turned into style names
+(`ansiSegments.ts`, pure). It is not recorded in the transcript (a reload
+doesn't show it), but the remote event log keeps it for a reconnect. A
+command's y/n question is a `confirm` / `confirmAnswer` pair; the first answer
+wins and `confirmDone` removes the card elsewhere. Lines from a remote device
+run as commands too, except `/copy`, `/login` and `/remote` (`REMOTE_UNAVAILABLE`
+in `webCommands.ts`). A remote Restart asks with a confirm card, not the modal
+dialog on the Mac. The chat's `ready` message carries `slash: true`; a page
+turns on `body.slash-chat` from it (rule buttons, Restart, Resume, new tab,
+Settings and the "/" menu), so a terminal chat shown on the same page gets
+none of those.
 
 The webview's messages are handled in `ChatSession.onMessage` (the
 `switch` on `msg.type`) and `webview/main.ts` (the `message` listener); those
@@ -186,11 +196,15 @@ keeps running here. Plan and decisions: `docs/REMOTE-CONTROL.md`.
   fragment, exchanged for an `HttpOnly; SameSite=Strict` cookie (`Secure` when
   the request came through a proxy). Only a hash of the cookie value is stored
   (in SecretStorage). Every `/api` request needs the cookie and a same-origin
-  request; messages pass `remotePolicy.ts` (an allow-list that also removes the
-  `rule` and `folder` fields of an approval).
-- A remote approval must be allow once or deny once: `AcpClient.respondToApproval`
-  with `onceOnly` throws for any other option kind (the option ids come from the
-  engine, `allow_always` saves a rule), leaving the request waiting.
+  request; messages pass `remotePolicy.ts`, an allow-list that bounds each
+  field. A paired device is trusted as the owner: it may send approval rules,
+  Autopilot and the other Settings options (`autopilot` needs `approve`),
+  restart, resume, new tab and "/" commands. Not allowed: login, the remote
+  switch, attachments and anything that opens something on the Mac.
+- A chat tab takes any approval option from a remote device. A terminal chat's
+  `RemoteActions` still passes `onceOnly` (`AcpClient.respondToApproval` throws
+  for any other option kind, leaving the request waiting) and keeps Autopilot
+  and the other settings to itself.
 - Whoever answers an approval, `ChatSession` posts `approvalResolved` with a
   label ("Allowed from <device>" or "on the desktop"), so the other screens
   drop their card and say who answered. Questions already did this.

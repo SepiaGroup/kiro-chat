@@ -16,6 +16,13 @@ export const TAB_UNAVAILABLE: Record<string, string> = {
   quit: "Close the tab to end this chat.",
 };
 
+/** Commands that would act on the Mac's own screen, so a remote device is told instead. */
+export const REMOTE_UNAVAILABLE: Record<string, string> = {
+  copy: "/copy would copy to the Mac's clipboard. Use the Copy button on a code block.",
+  login: "/login opens a terminal on the Mac. Log in there, then use /restart.",
+  remote: "/remote starts or stops remote access on the Mac; stopping it would cut this device off.",
+};
+
 export interface TabCommand {
   name: string;
   description: string;
@@ -23,13 +30,13 @@ export interface TabCommand {
   type: "builtin";
 }
 
-function usable(c: CommandSpec): boolean {
-  return !c.unavailable && !TAB_UNAVAILABLE[c.name];
+function usable(c: CommandSpec, remote = false): boolean {
+  return !c.unavailable && !TAB_UNAVAILABLE[c.name] && !(remote && REMOTE_UNAVAILABLE[c.name]);
 }
 
-/** For the "/" picker in a chat tab. */
-export function tabCommandList(): TabCommand[] {
-  return COMMANDS.filter(usable).map((c) => ({
+/** For the "/" picker in a chat tab (`remote`: on a remote device's page). */
+export function tabCommandList(remote = false): TabCommand[] {
+  return COMMANDS.filter((c) => usable(c, remote)).map((c) => ({
     name: c.name,
     description: c.desc,
     ...(c.args ? { inputHint: c.args } : c.subs ? { inputHint: c.subs.map((s) => s.name).join(" | ") } : {}),
@@ -45,7 +52,7 @@ export type SlashRoute =
   | { kind: "unknown"; text: string; name: string };
 
 /** What a line typed in a chat tab is, as the terminal chat decides it. */
-export function routeSlash(text: string, engineCommands: ReadonlyArray<{ name: string }>): SlashRoute {
+export function routeSlash(text: string, engineCommands: ReadonlyArray<{ name: string }>, remote = false): SlashRoute {
   // A leading space sends "/..." to the agent as plain text.
   if (!text.startsWith("/")) {
     return { kind: "agent" };
@@ -55,7 +62,7 @@ export function routeSlash(text: string, engineCommands: ReadonlyArray<{ name: s
   const word = m?.[1] ?? "";
   const spec = findCommand(word);
   if (spec) {
-    const reason = spec.unavailable ?? TAB_UNAVAILABLE[spec.name];
+    const reason = spec.unavailable ?? TAB_UNAVAILABLE[spec.name] ?? (remote ? REMOTE_UNAVAILABLE[spec.name] : undefined);
     return reason ? { kind: "unavailable", text: trimmed, reason } : { kind: "run", name: spec.name, arg: (m?.[2] ?? "").trim(), text: trimmed };
   }
   if (engineCommands.some((c) => c.name.toLowerCase() === word.toLowerCase())) {
@@ -66,8 +73,8 @@ export function routeSlash(text: string, engineCommands: ReadonlyArray<{ name: s
 }
 
 /** /help in a chat tab. */
-export function tabHelp(engineCommands: ReadonlyArray<{ name: string; description?: string }>): string {
-  const list = COMMANDS.filter(usable);
+export function tabHelp(engineCommands: ReadonlyArray<{ name: string; description?: string }>, remote = false): string {
+  const list = COMMANDS.filter((c) => usable(c, remote));
   const left = (c: CommandSpec): string => "/" + c.name + (c.args ? " " + c.args : c.subs ? " …" : "");
   const width = Math.min(26, Math.max(...list.map((c) => left(c).length)) + 2);
   const lines = [style.bold("Commands") + style.gray("  (type / for a menu)")];
@@ -83,7 +90,7 @@ export function tabHelp(engineCommands: ReadonlyArray<{ name: string; descriptio
   lines.push(
     "",
     style.gray("Start a line with a space to send /… to the agent as text."),
-    style.gray(`In the terminal chat only: ${Object.keys(TAB_UNAVAILABLE).map((n) => "/" + n).join(", ")}.`)
+    style.gray(`Not available here: ${Object.keys(remote ? { ...TAB_UNAVAILABLE, ...REMOTE_UNAVAILABLE } : TAB_UNAVAILABLE).map((n) => "/" + n).join(", ")}.`)
   );
   return lines.join("\n");
 }

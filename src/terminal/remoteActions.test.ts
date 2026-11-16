@@ -114,10 +114,12 @@ test("compact uses the terminal's own /compact and is refused while the terminal
 test("settings and stop say which device changed them", async () => {
   const r = rig();
   await r.actions.handle({ type: "setConfig", id: "effortLevel", value: "high" }, "iPhone");
-  await r.actions.handle({ type: "setConfig", id: "other", value: "x" }, "iPhone");
+  // The policy lets a chat tab's page change more; a terminal chat keeps those to itself.
+  await r.actions.handle({ type: "setConfig", id: "autopilot", value: "on" }, "iPhone");
+  assert.match(String(r.posted.at(-1)?.text), /terminal chat only/);
   await r.actions.handle({ type: "setMode", modeId: "plan" }, "iPhone");
   await r.actions.handle({ type: "cancelTurn" }, "iPhone");
-  assert.deepEqual(r.printed, ["Effort changed from iPhone.", "other changed from iPhone.", "Mode changed from iPhone."]);
+  assert.deepEqual(r.printed, ["Effort changed from iPhone.", "Mode changed from iPhone."]);
   r.state.turnRunning = true;
   await r.actions.handle({ type: "cancelTurn" }, "iPhone");
   assert.deepEqual(r.calls.at(-1), ["cancel"]);

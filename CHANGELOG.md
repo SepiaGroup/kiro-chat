@@ -5,6 +5,7 @@
 First release.
 
 - `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
+- Remote devices can do what you can at the keyboard in a chat tab: all the approval choices (rules included), Autopilot and the other settings, Restart, Resume, new tabs and the `/` commands, with their output on the phone. `/login`, `/remote` and `/copy` stay on the Mac. Terminal chats on the phone are unchanged.
 - Slash commands work in chat tabs: `/usage`, `/context`, `/tools`, `/model`, `/compact`, `/help` and the rest of the terminal chat's commands run there, with their output in a card. Before, they went to the agent as text.
 - Fixed: the chat didn't follow a tool card as it grew, and a command's output box showed the start of the output instead of the end.
 - Remote access shows terminal chats too: watch them, prompt, stop, and answer approvals and questions from the phone.
