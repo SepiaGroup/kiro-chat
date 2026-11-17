@@ -1,6 +1,6 @@
 {
-  "name": "kiro-chat",
-  "displayName": "Kiro Chat",
+  "name": "kiro-cli-chat",
+  "displayName": "Kiro CLI Chat",
   "description": "Chat with the Kiro agent in editor tabs, the side bar or a terminal. Approvals, slash commands, session resume, and remote control from your phone over Tailscale. Runs on Macs without AVX.",
   "version": "0.1.0",
   "publisher": "SepiaGroup",

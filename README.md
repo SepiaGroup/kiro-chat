@@ -1,4 +1,4 @@
-# Kiro Chat
+# Kiro CLI Chat
 
 Chat with the Kiro agent inside VS Code, and carry on from your phone.
 

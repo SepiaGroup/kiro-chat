@@ -20,7 +20,7 @@ First release.
 - Fixed: reply text written after a tool call was added to the reply above the tool cards, so the end of a long answer seemed missing.
 - Chat with the Kiro v3 engine in editor tabs, the panel, or a text-mode
   terminal chat. Works on Macs without AVX/AVX2.
-- The extension is called Kiro Chat (was "Kiro CLI Chat"): its id is `sepiagroup.kiro-chat` and its settings and commands start with `kiroChat.` (was `kiroCliChat.`). Paired devices have to pair again.
+- The extension's id is `sepiagroup.kiro-cli-chat` ("Kiro CLI Chat" in the Marketplace; "Kiro Chat" was taken). Inside VS Code it's called Kiro Chat, and its settings and commands start with `kiroChat.` (was `kiroCliChat.`). Paired devices have to pair again.
 - Approvals like kiro-cli: Allow, Create allow rule… (exact, command pattern,
   folder, entire tool), Deny, Deny with reason…, Create deny rule….
 - The agent's questions (Spec mode) as a card or numbered choices, with your

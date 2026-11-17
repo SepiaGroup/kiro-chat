@@ -18,7 +18,8 @@ to the program's full path.
 
 ## 2. Install the extension
 
-Install **Kiro Chat** from the Extensions view (search for "Kiro Chat"), or
+Install **Kiro CLI Chat** (id `SepiaGroup.kiro-cli-chat`) from the Extensions
+view (search for "Kiro CLI Chat"), or
 from a `.vsix` file with **Extensions: Install from VSIX…**.
 
 ## 3. Open a chat

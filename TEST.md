@@ -27,8 +27,8 @@ push and pull request.
 ## Install
 
 ```sh
-npm run package   # builds and writes kiro-chat-<version>.vsix
-code --install-extension kiro-chat-0.1.0.vsix --force
+npm run package   # builds and writes kiro-cli-chat-<version>.vsix
+code --install-extension kiro-cli-chat-0.1.0.vsix --force
 ```
 
 Then run **Developer: Reload Window**.
