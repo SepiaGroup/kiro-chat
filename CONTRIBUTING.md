@@ -36,17 +36,17 @@ machine.
 ## Release
 
 1. Update `version` in `package.json` and add an entry to `CHANGELOG.md`.
-2. `npm run package` → `kiro-chat-<version>.vsix`.
-3. Install it (`code --install-extension kiro-chat-<version>.vsix --force`)
+2. `npm run package` → `kiro-cli-chat-<version>.vsix`.
+3. Install it (`code --install-extension kiro-cli-chat-<version>.vsix --force`)
    and run the manual checks.
 4. Commit, tag `v<version>`, push.
 5. Publish the same `.vsix` to both registries, so they ship identical files:
    - VS Code Marketplace (VS Code): `npx vsce publish --packagePath
-     kiro-chat-<version>.vsix`. Needs a Marketplace token for the `SepiaGroup`
+     kiro-cli-chat-<version>.vsix`. Needs a Marketplace token for the `SepiaGroup`
      publisher (`npx vsce login SepiaGroup`). Or upload the `.vsix` in the
      Marketplace portal.
    - Open VSX (Kiro IDE, VSCodium, Cursor and other VS Code builds):
-     `npx ovsx publish kiro-chat-<version>.vsix -p <token>`. Needs an Open VSX
+     `npx ovsx publish kiro-cli-chat-<version>.vsix -p <token>`. Needs an Open VSX
      token from an account that owns the `SepiaGroup` namespace.
 
    Publish from the tagged commit, after `git status` shows nothing changed:

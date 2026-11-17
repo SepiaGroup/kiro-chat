@@ -71,6 +71,6 @@ skill first. Don't build on a guessed message shape.
 - `docs/ARCHITECTURE.md`: design and any new engine facts.
 - CHANGELOG.md: one line under the unreleased version.
 
-Then install the build (`code --install-extension kiro-chat-<version>.vsix
+Then install the build (`code --install-extension kiro-cli-chat-<version>.vsix
 --force`), ask the user to reload and try it, and open a PR from a `feat/…`
 branch.

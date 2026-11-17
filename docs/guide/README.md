@@ -1,6 +1,7 @@
-# Kiro Chat guide
+# Kiro CLI Chat guide
 
-How to set up and use the Kiro Chat extension for VS Code.
+How to set up and use the Kiro CLI Chat extension for VS Code. Inside VS Code
+it's called Kiro Chat.
 
 1. [Getting started](getting-started.md): install kiro-cli, log in, open your
    first chat.

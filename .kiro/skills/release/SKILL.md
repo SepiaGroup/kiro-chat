@@ -21,7 +21,7 @@ agent:
 5. Publishing goes to the VS Code Marketplace and to Open VSX, from the same
    `.vsix` built at the tagged commit. It needs the user's tokens for the
    `SepiaGroup` publisher and namespace. Don't publish yourself; give the user
-   the commands (`npx vsce publish --packagePath kiro-chat-<version>.vsix` and
-   `npx ovsx publish kiro-chat-<version>.vsix -p <token>`, see
+   the commands (`npx vsce publish --packagePath kiro-cli-chat-<version>.vsix` and
+   `npx ovsx publish kiro-cli-chat-<version>.vsix -p <token>`, see
    CONTRIBUTING.md) or the `.vsix` to upload.
    Attach the `.vsix` to a GitHub release with `gh release create` if asked.
