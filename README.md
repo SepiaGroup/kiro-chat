@@ -20,6 +20,33 @@ Chat with the Kiro agent inside VS Code, and carry on from your phone.
 
 It needs the Kiro CLI (`kiro-cli`) installed and logged in. See Requirements.
 
+![A chat tab waiting for approval of a file change](docs/images/approval-diff.png)
+
+## Quick start
+
+1. Install the [Kiro CLI](https://kiro.dev) and run `kiro-cli login`.
+2. Press `Cmd+Alt+K` (`Ctrl+Alt+K` on Windows), or click the Kiro Chat button
+   at the top right of the editor.
+3. Type a prompt and press Enter. Approve or deny the agent's changes as they
+   come.
+
+## Guides
+
+- [Getting started](docs/guide/getting-started.md)
+- [Chat tabs and the side bar chat](docs/guide/chat-tabs.md)
+- [Terminal chat](docs/guide/terminal-chat.md)
+- [Slash commands](docs/guide/slash-commands.md)
+- [Remote access from your phone](docs/guide/remote-access.md)
+- [Commands and settings](docs/guide/reference.md)
+- [Troubleshooting](docs/guide/troubleshooting.md)
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Slash command picker](docs/images/slash-picker.png) | ![Context breakdown](docs/images/context.png) |
+| ![Terminal chat](docs/images/terminal-chat.png) | ![Remote access pairing card](docs/images/pairing-card.png) |
+
 ## How it works
 
 Kiro Chat starts the agent engine with `kiro-cli acp` and talks to it over the
@@ -44,292 +71,10 @@ slash commands use v3-only ACP methods.
 - Logged in (`kiro-cli login`). The chat checks at startup and offers a login
   button if you aren't.
 - VS Code 1.98 or later.
-
-## Two ways to chat
-
-### Chat tabs (webview)
-
-`Cmd+Alt+K` (`Ctrl+Alt+K` elsewhere), the **Kiro Chat** status-bar item, or **Kiro Chat:
-Open Chat** opens the chat as an editor tab (set `kiroChat.openIn` to
-`panel` to use the side bar instead). The **Kiro Chat** ghost button at the top right of the editor does the same as
-Open Chat. The **Kiro Chat** icon in the Activity Bar
-(the left edge) always opens the side bar chat. Drag its icon or its view
-elsewhere (for example into the bottom panel) if you prefer.
-
-- **Multiple chats.** Each tab is its own conversation with its own engine.
-  Open another with the **＋** button in the toolbar or **Kiro Chat: New
-  Chat Tab**. The side bar chat view is a separate conversation too.
-- **Survives reloads.** After a window reload, every tab and the side bar view
-  reopen the session they had, with the history shown again.
-- **Toolbar.** Model dropdown (switches live), context ring with the percentage
-  used, Mode dropdown (Default, Plan, …), Resume, Restart, ＋ and ⚙ Settings.
-- **Context breakdown.** Hover (or focus) the context ring to see tokens and
-  percent for the conversation, MCP servers, steering/context files, session
-  files and memory, plus credits used. **Compact context** summarizes the
-  conversation to free space.
-- **Replies** stream as markdown (headings, lists, tables, code blocks with a
-  Copy button). Tool calls show as cards with the files touched, `+`/`-` diffs
-  and how long they took.
-- **Approvals.** In Supervised mode (Autopilot off) file changes and commands
-  wait for your answer, with the same choices as kiro-cli: **Allow**,
-  **Create allow rule…**, **Deny**, **Deny with reason…** (the agent is told
-  why) and **Create deny rule…**. A rule covers this exact file or
-  command, the command pattern (`find *`), a folder and everything under it
-  (file changes; you can edit the folder), or the entire tool (every
-  command, every file read, …). Rules last for the session. A line like
-  `a; b && c` is asked one command at a time, and the card says which.
-- **Images.** Paste a screenshot (`Cmd+V`), Shift-drag image files onto the
-  chat, or use **Kiro Chat: Attach Image or File**. Dropping other files
-  inserts their paths.
-- **Questions.** When the agent asks you something (it does in Spec mode),
-  a card shows the choices. Pick one, or type your own answer. A choice
-  can open a checklist first. Skip tells the agent to move on.
-- **Files in a prompt.** Type `@file:path` (relative to the folder, absolute
-  or `~/…`) and the file's text goes to the agent with your prompt. The chat
-  keeps showing what you typed. Files must be plain text, up to 256 KB each
-  (1 MB per prompt); anything else is left as typed. The chat says which files
-  were attached and which were not. Any path you type is read, also outside the
-  folder (as kiro-cli does), so check pasted text before you send it.
-- **Typing while the agent works.** Enter sends your message to the agent
-  right away. It reads it at its next step (after a running tool call, not in
-  the middle of one), and a line under your message says when. Images and `/`
-  commands wait until the reply is done.
-- **Stopping a reply.** While the agent works, a **Stop** button appears next
-  to Send; Esc in the message box does the same. The reply ends with
-  "■ Cancelled" and any approval it was waiting on is dropped. The chat is
-  ready for your next message.
-- **Editor context (optional).** With `kiroChat.shareEditorContext` on, the
-  agent is told which files are open in VS Code and which is active (paths
-  only, inside the chat's folder). It is sent with a prompt when it changed,
-  and the chat says so. Works in both chats.
-- **Input.** One line that grows as you type. Enter sends, Shift+Enter adds a
-  line. Type `/` for a picker of commands, agents and skills.
-- **Slash commands.** The terminal chat's commands work in a chat tab too
-  (`/usage`, `/context`, `/tools`, `/model`, `/agent`, `/compact`, `/mcp`,
-  `/knowledge`, `/config`, `/stats`, `/transcript`, …; `/help` lists them).
-  Their output shows in a card under the command, only in this tab (it isn't
-  kept after a reload). `/clear` and `/new` start a new conversation,
-  `/resume` opens the Resume panel. `/paste`, `/editor`, `/reply`, `/rewind`,
-  `/spawn`, `/cls` and `/quit` are for the terminal chat and say what to do
-  instead. The agent's own commands (agents, skills, saved prompts) still go to
-  the agent, and so does a line that starts with a space. Unknown commands
-  aren't sent. The same commands work from a remote device (see Remote
-  access).
-- **Renaming a chat.** `/title <name>`, **Rename Chat…** on the tab's
-  right-click menu or **Kiro Chat: Rename Chat…** renames the chat: its
-  tab (or the side bar view), the list on a remote
-  device and the session in Resume. The name stays after a reload. `/title`
-  shows the name, and `/title clear` (or an empty name in Rename Chat) gives
-  the chat its own name back ("Kiro Chat 2"), so a chat can't be named
-  `clear`. Resume keeps the last name after a reset. The right-click item
-  shows on other webview tabs too (VS Code can't limit it to chat tabs);
-  there it only says so.
-- **Resume** lists previous sessions for this folder (title, age, message
-  count). **Restart** asks before restarting the engine and clearing the chat.
-  Clicking outside the Resume or Settings panel (or Esc) closes it.
-- **Settings (⚙):** Effort, Autopilot, memory reflection and content
-  collection, applied to the live session.
-
-### Terminal chat (text mode)
-
-A text-only chat in the Terminal panel, next to your shells. Open it with
-**Kiro Chat: New Terminal Chat (text mode)** or the **Kiro Chat** entry in
-the Terminal panel's **+** dropdown. Each terminal has its own engine and
-conversation, so you can open several.
-
-It streams markdown (colors, lists, code blocks), shows tool cards with diffs
-and asks for approvals with kiro-cli's keys: `y` allow, `t` create an allow
-rule, `n` deny, Tab deny with a reason, `d` create a deny rule. The rule keys
-list the rules to pick by number (exact, pattern, folder, entire tool); Esc
-goes back. The prompt shows the context used (`17% >`,
-or `17% !>` with Autopilot), and each reply ends with
-`▸ Credits: … • Time: …`.
-
-The agent's questions show as numbered choices: type a number or your own
-answer, Enter sends (an empty line takes the recommended choice), Esc skips.
-`@file:path` in a prompt attaches that file, as in the webview chat.
-
-With remote access on, terminal chats show on the phone as well (see Remote
-access).
-
-Type `/` for a menu of commands: it filters as you type, ↑/↓ selects, Tab
-completes, Enter runs, Esc hides it. After a command it suggests subcommands
-and values (e.g. `/context ` → add/remove/clear/show, `/model ` → models).
-
-Commands follow kiro-cli: `/help`, `/clear`, `/new`, `/chat new|save|load`,
-`/resume`, `/rewind`, `/compact`, `/title`, `/transcript`, `/copy`, `/editor`,
-`/reply`, `/paste`, `/spawn`, `/context`, `/knowledge`, `/model`, `/effort`,
-`/agent` (incl. `create`/`edit`), `/plan`, `/prompts`, `/tools`, `/autopilot`,
-`/mcp`, `/hooks`, `/code`, `/config`, `/set`, `/usage`, `/stats`, `/changelog`,
-`/settings`, `/theme`, `/restart`, `/login`, `/remote`, `/cls`, `/quit`.
-
-- `/guide`, `/goal` and `/voice` aren't available (the engine or this machine
-  can't support them) and say so.
-- `/rewind` undoes the agent's file changes after that point, so it asks first.
-- `/tools trust-all` and `/tools reset` switch Autopilot on and off (the engine
-  only supports trusting all tools at once).
-- Unknown slash commands aren't sent to the agent; start the line with a space
-  to send `/...` as plain text.
-
-Keys: Enter sends, Shift+Enter adds a new line, Esc cancels a reply, ↑/↓ for
-history. While the agent works you can still type: the line shows on the status
-line, and Enter sends it to the agent, which reads it at its next step. Esc
-first takes back a message the agent hasn't read yet, and the next Esc cancels
-the reply. Commands and images wait until the reply is done. Drag image files onto the terminal (or type their paths), or `/paste`
-a copied image, to attach them.
-
-## Remote access (preview)
-
-Watch and use a chat tab from your phone (or any browser on your tailnet)
-while it keeps running on this Mac. The traffic goes over [Tailscale](https://tailscale.com),
-so only your own devices can reach it, and nothing is hosted anywhere else.
-
-One-time setup:
-
-1. Install Tailscale on the Mac and the phone and log in to the same tailnet.
-2. In the Tailscale admin console, turn on **HTTPS Certificates** (DNS page).
-   The first time you start remote access, Tailscale may also give a link to
-   switch on Serve; the extension shows it with an **Open Tailscale Setup**
-   button.
-
-Then:
-
-1. Tick **Remote access** in ⚙ Settings, run **Kiro Chat: Start Remote
-   Access**, or type `/remote` in a terminal chat (`/remote link` for a new
-   pairing card, `/remote stop` or `/remote off` to turn it off). A **Remote** item appears in the status bar.
-2. A card opens with a QR code. Scan it with the phone's camera, or choose
-   **Copy Link** (and send it, for example with AirDrop or Messages) or **Open
-   in Browser**. **New Link** makes a fresh code. The pairing link works once,
-   for 10 minutes, and the page removes the secret from the address bar. The
-   card closes when a device pairs.
-3. Pick a chat. You see the conversation as it is here, and can send prompts,
-   steer, stop a reply, answer questions, approve (with the same choices as
-   here, rules included) and run `/` commands.
-   Both screens stay in step: answer an approval on one and it goes away on the
-   other, with a line saying who answered.
-
-The address looks like `https://<your-mac>.<tailnet>.ts.net:8443/`. Next time,
-open it (or the home screen icon) with Tailscale on: no new link. If Tailscale
-is missing or not ready, remote access still starts for this Mac only
-(`http://127.0.0.1`) and says what to fix.
-
-**Several VS Code windows.** Turn remote access on in each window you want on
-the phone. They share one address, one pairing and one list: the page shows the
-chats of every window ("MyRepo: Chat 1"), and the dropdown at the left of the
-toolbar shows which chat you are on and switches between them. One window (the first) holds the address;
-if it closes or you stop remote access in it, another window takes over within a
-few seconds and the page reconnects by itself. **Show Remote Access Link** and
-**Remove Remote Device…** work from any of the windows. A window where remote
-access is off is not shown.
-
-A paired device stays paired until you remove it (**Remove Remote Device…**).
-Remote access is off by default and when VS Code closes (the extension takes its
-Tailscale share down; nothing else of yours in `tailscale serve` is touched).
-A paired device is trusted like you at the keyboard: for a chat tab it can
-create allow or deny rules, switch Autopilot on, restart the engine, resume a
-session, open a tab and run `/` commands (`/usage`, `/context`, `/compact`,
-`/tools trust-all`, …; their output shows on the phone and in the tab). If a
-device is lost, remove it (**Remove Remote Device…**) or take it out of your
-tailnet. **If you paired a device before this version, it can now do all of
-this.** To keep a device from answering approvals at all, take `approve` out of
-`kiroChat.remote.permissions`. There is no setting for "Allow once and
-Deny only".
-
-What would act on the Mac itself is left out, and the command says so:
-logging in, `/remote`, `/copy`, `/settings`, `/theme`, `/transcript`,
-`/chat save`, `/agent create` and `/agent edit` (they open an editor, a
-terminal or a file there), and `/context add` and `/knowledge add|update`
-(they read a path on the Mac). `/set` changes only the Settings panel's
-options. Restart asks on the phone, not in a dialog on the Mac. Of the
-`kiroChat.remote.permissions`, `prompt` covers commands, Restart, Resume and
-new tabs, and `approve` covers the approval buttons and everything that
-changes approvals or Autopilot: the switch, `/autopilot`, `/tools trust-all`,
-`/tools reset` and `/set autopilot`. The page fits a phone (light or dark
-by the device's setting, large buttons, Enter adds a line and the Send button
-sends) and can be added to the home screen. The settings below are machine
-settings, so a workspace cannot turn remote access on.
-
-**Terminal chats** are listed too ("Kiro Chat (terminal)"), and work the same
-way: the page shows the conversation, and a prompt, Stop, an approval or an
-answer from the phone acts in the terminal, which says so ("(from iPhone)",
-"Allowed from iPhone"). A prompt from the phone goes to the agent as typed: it
-never runs a terminal `/` command, and the phone offers only the agent's own
-commands there. An approval from the phone has every choice the terminal has
-(allow, deny, with a reason, allow and deny rules, folders), and the terminal
-says what was chosen. Only Effort and Model can be changed. While a command
-runs in the terminal (`/compact`, `/resume`, …) the phone is asked to try
-again. The page shows the terminal's conversation since the terminal opened (or
-since `/clear`, `/new` or `/resume`); after `/rewind` it says the later
-messages are no longer part of it.
-
-## Commands
-
-| Command | What it does |
-| --- | --- |
-| Kiro Chat: Open Chat (`Cmd+Alt+K`) | Shows the most recent chat tab (or the panel, per `openIn`). |
-| Kiro Chat: New Chat Tab | Opens another chat tab with a new conversation. |
-| Kiro Chat: Open Chat in Editor Tab / in Side Bar | Opens the chat in that place. |
-| Kiro Chat: New Terminal Chat (text mode) | Opens a terminal chat. |
-| Kiro Chat: New Session | Asks, then starts a fresh conversation in the current chat. |
-| Kiro Chat: Resume Previous Session | Opens the current chat's Resume panel. |
-| Kiro Chat: Restart Engine | Asks, then restarts the current chat's engine. |
-| Kiro Chat: Rename Chat… | Renames the current chat, or the tab right-clicked (empty: back to its own name). |
-| Kiro Chat: Log In | Runs `kiro-cli login` in a terminal. |
-| Kiro Chat: Attach Image or File | File picker; images attach, other files insert their path. |
-| Kiro Chat: Start / Stop Remote Access | Starts or stops the remote access server. |
-| Kiro Chat: Show Remote Access Link | The pairing card: a new one-use link as a QR code, to copy or open. |
-| Kiro Chat: Remove Remote Device… | Unpairs one device, or all of them. |
-
-"Current chat" is the chat tab or side bar view you used last.
-
-## Settings
-
-| Setting | Default | Description |
-| --- | --- | --- |
-| `kiroChat.openIn` | `editor` | Where Open Chat goes: `editor` (tab) or `panel` (the side bar view). |
-| `kiroChat.kiroCliPath` | _(empty)_ | Path to `kiro-cli`. Empty = PATH, then `~/.local/bin/kiro-cli` (on Windows `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`). Must be the program, not a `.cmd` script. User settings only (a workspace can't set it). |
-| `kiroChat.defaultModel` | `auto` | Model for new sessions (see `kiro-cli chat --list-models`). |
-| `kiroChat.autopilot` | `false` | Off = Supervised (approve each change). On = tools run without asking. |
-| `kiroChat.enterToSend` | `true` | Enter sends, Shift+Enter adds a line. Off reverses them. |
-| `kiroChat.defaultEngine` | `auto` | `auto` checks that the engine runs on this machine (once, then remembered) or `v3`. |
-| `kiroChat.shareEditorContext` | `false` | Tell the agent which files are open in the editor and which is active (paths only, files inside the chat's folder only). Sent with a prompt when it changed; the chat says so. Ignored in an untrusted workspace. |
-| `kiroChat.remote.autoStart` | `false` | Start remote access when VS Code starts. Machine setting. |
-| `kiroChat.remote.permissions` | `view`, `prompt`, `approve` | What a paired device may do: `view` chats, `prompt` (send, steer, stop, answer questions), `approve` (allow or deny once). Machine setting. |
-| `kiroChat.remote.httpsPort` | `8443` | The HTTPS port Tailscale uses (443, 8443 or 10000). 8443 leaves 443 to anything you already serve. Machine setting. |
-| `kiroChat.remote.port` | `0` | Local port for remote access (listens on 127.0.0.1 only). 0 reuses the port of last time when it is free, otherwise picks a free one, so an open page reconnects after a restart. Machine setting. |
-| `kiroChat.interactionMode` | `persistent` | `persistent` (ACP) is required for everything above. `one-shot` is a basic fallback with no approvals. |
-
-## Troubleshooting
-
-Logs are in **Output → Kiro Chat** (View → Output, then pick it from the
-list). They show the kiro-cli path used, the engine detected and the engine's
-own messages.
-
-- **"Could not find the kiro-cli binary"**: install kiro-cli, or set
-  `kiroChat.kiroCliPath` (user settings) to its full path. `which kiro-cli`
-  in a terminal (`where kiro-cli` in PowerShell) shows where it is.
-- **"kiroChat.kiroCliPath is set to …, which doesn't exist"**: fix or clear
-  the setting.
-- **Login card keeps coming back**: run `kiro-cli login` in a terminal, then
-  click Retry. `kiro-cli whoami` shows whether you're logged in.
-- **"No Kiro engine runs on this machine"**: run
-  `kiro-cli chat --agent-engine v3` in a terminal. If that crashes with
-  `illegal hardware instruction` (SIGILL), your kiro-cli version needs AVX even
-  for the engine; try updating it.
-- **"The Kiro engine sent nothing for 10m 0s"**: the engine never replied to
-  your prompt, so the turn was cancelled. Send it again; use Restart if it
-  keeps happening. A turn that goes quiet after it has started is not stopped
-  (a build can take a while); the log notes it after 30 seconds.
-- **"The Kiro engine didn't answer … within …s"**: the engine hung while
-  starting. Use **Restart** (or `/restart` in a terminal chat); the log shows
-  the engine's last messages.
-- **A reply fails with "Not authenticated" or "Session expired"**: log in
-  again (the Log In command, or `/login` in the terminal chat), then send the
-  message again. Network and session errors say what to try.
-- **A red "busy" or rate-limit line during a reply**: the engine is short of
-  capacity and retries; the reply carries on.
-- **Engine exited**: the chat says so. Restart starts a new engine; Resume
-  reopens the conversation.
+- For remote access only: [Tailscale](https://tailscale.com), free for personal
+  use, installed and logged in on this computer and on the phone, in the same
+  tailnet, with HTTPS Certificates turned on. See
+  [Remote access](docs/guide/remote-access.md). The chat works without it.
 
 ## Privacy
 
