@@ -7,12 +7,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SepiaGroup/kiro-cli-chat.git"
+    "url": "https://github.com/SepiaGroup/kiro-chat.git"
   },
   "bugs": {
-    "url": "https://github.com/SepiaGroup/kiro-cli-chat/issues"
+    "url": "https://github.com/SepiaGroup/kiro-chat/issues"
   },
-  "homepage": "https://github.com/SepiaGroup/kiro-cli-chat#readme",
+  "homepage": "https://github.com/SepiaGroup/kiro-chat#readme",
   "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.98.0"
