@@ -51,7 +51,10 @@
       {
         "command": "kiroChat.open",
         "title": "Kiro Chat: Open Chat",
-        "icon": "$(comment-discussion)"
+        "icon": {
+          "light": "media/button-light.svg",
+          "dark": "media/button-dark.svg"
+        }
       },
       {
         "command": "kiroChat.newSession",
@@ -91,7 +94,7 @@
       },
       {
         "command": "kiroChat.openInPanel",
-        "title": "Kiro Chat: Open Chat in Panel",
+        "title": "Kiro Chat: Open Chat in Side Bar",
         "icon": "$(layout-panel)"
       },
       {
@@ -121,16 +124,16 @@
       }
     ],
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
-          "id": "kiroChatPanel",
+          "id": "kiroChat",
           "title": "Kiro Chat",
-          "icon": "media/icon.svg"
+          "icon": "media/activity.svg"
         }
       ]
     },
     "views": {
-      "kiroChatPanel": [
+      "kiroChat": [
         {
           "id": "kiroChat.chatView",
           "name": "Chat",
@@ -164,10 +167,10 @@
           ],
           "enumDescriptions": [
             "Open the chat as an editor tab (supports VS Code's native file-drop overlay: hold Shift to drop images/files).",
-            "Open the chat in the panel/side bar view (wherever you've moved it)."
+            "Open the chat in the side bar view (the Kiro Chat icon in the Activity Bar, or wherever you've moved it)."
           ],
           "default": "editor",
-          "markdownDescription": "Where **Open Chat** (`Cmd+Alt+K / Ctrl+Alt+K`, status bar) opens the chat. Each chat tab and the panel view is its own conversation."
+          "markdownDescription": "Where **Open Chat** (`Cmd+Alt+K / Ctrl+Alt+K`, status bar) opens the chat. Each chat tab and the side bar view is its own conversation. The Activity Bar icon always opens the side bar view."
         },
         "kiroChat.kiroCliPath": {
           "type": "string",
@@ -255,6 +258,12 @@
       }
     },
     "menus": {
+      "editor/title": [
+        {
+          "command": "kiroChat.open",
+          "group": "navigation@100"
+        }
+      ],
       "editor/title/context": [
         {
           "command": "kiroChat.renameChat",

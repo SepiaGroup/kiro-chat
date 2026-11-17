@@ -1,7 +1,7 @@
 # Kiro Chat
 
 A VS Code extension for chatting with the Kiro agent: in editor tabs, in the
-bottom panel or in a terminal chat, with approvals, slash commands and remote
+the side bar or in a terminal chat, with approvals, slash commands and remote
 access from your phone.
 
 ## How it works
@@ -35,12 +35,15 @@ slash commands use v3-only ACP methods.
 
 `Cmd+Alt+K` (`Ctrl+Alt+K` elsewhere), the **Kiro Chat** status-bar item, or **Kiro Chat:
 Open Chat** opens the chat as an editor tab (set `kiroChat.openIn` to
-`panel` to use the bottom panel instead).
+`panel` to use the side bar instead). The **Kiro Chat** ghost button at the top right of the editor does the same as
+Open Chat. The **Kiro Chat** icon in the Activity Bar
+(the left edge) always opens the side bar chat. Drag its icon or its view
+elsewhere (for example into the bottom panel) if you prefer.
 
 - **Multiple chats.** Each tab is its own conversation with its own engine.
   Open another with the **＋** button in the toolbar or **Kiro Chat: New
-  Chat Tab**. The bottom-panel chat view is a separate conversation too.
-- **Survives reloads.** After a window reload, every tab and the panel view
+  Chat Tab**. The side bar chat view is a separate conversation too.
+- **Survives reloads.** After a window reload, every tab and the side bar view
   reopen the session they had, with the history shown again.
 - **Toolbar.** Model dropdown (switches live), context ring with the percentage
   used, Mode dropdown (Default, Plan, …), Resume, Restart, ＋ and ⚙ Settings.
@@ -98,7 +101,7 @@ Open Chat** opens the chat as an editor tab (set `kiroChat.openIn` to
   access).
 - **Renaming a chat.** `/title <name>`, **Rename Chat…** on the tab's
   right-click menu or **Kiro Chat: Rename Chat…** renames the chat: its
-  tab (or the panel view), the list on a remote
+  tab (or the side bar view), the list on a remote
   device and the session in Resume. The name stays after a reload. `/title`
   shows the name, and `/title clear` (or an empty name in Rename Chat) gives
   the chat its own name back ("Kiro Chat 2"), so a chat can't be named
@@ -249,7 +252,7 @@ messages are no longer part of it.
 | --- | --- |
 | Kiro Chat: Open Chat (`Cmd+Alt+K`) | Shows the most recent chat tab (or the panel, per `openIn`). |
 | Kiro Chat: New Chat Tab | Opens another chat tab with a new conversation. |
-| Kiro Chat: Open Chat in Editor Tab / in Panel | Opens the chat in that place. |
+| Kiro Chat: Open Chat in Editor Tab / in Side Bar | Opens the chat in that place. |
 | Kiro Chat: New Terminal Chat (text mode) | Opens a terminal chat. |
 | Kiro Chat: New Session | Asks, then starts a fresh conversation in the current chat. |
 | Kiro Chat: Resume Previous Session | Opens the current chat's Resume panel. |
@@ -261,13 +264,13 @@ messages are no longer part of it.
 | Kiro Chat: Show Remote Access Link | The pairing card: a new one-use link as a QR code, to copy or open. |
 | Kiro Chat: Remove Remote Device… | Unpairs one device, or all of them. |
 
-"Current chat" is the chat tab or panel view you used last.
+"Current chat" is the chat tab or side bar view you used last.
 
 ## Settings
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `kiroChat.openIn` | `editor` | Where Open Chat goes: `editor` (tab) or `panel`. |
+| `kiroChat.openIn` | `editor` | Where Open Chat goes: `editor` (tab) or `panel` (the side bar view). |
 | `kiroChat.kiroCliPath` | _(empty)_ | Path to `kiro-cli`. Empty = PATH, then `~/.local/bin/kiro-cli` (on Windows `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`). Must be the program, not a `.cmd` script. User settings only (a workspace can't set it). |
 | `kiroChat.defaultModel` | `auto` | Model for new sessions (see `kiro-cli chat --list-models`). |
 | `kiroChat.autopilot` | `false` | Off = Supervised (approve each change). On = tools run without asking. |

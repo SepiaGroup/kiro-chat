@@ -1,5 +1,5 @@
 // One chat conversation: its own engine process, transcript and state, shown
-// in one webview at a time (an editor tab or the bottom-panel view).
+// in one webview at a time (an editor tab or the side bar view).
 
 import * as vscode from "vscode";
 import { AcpClient } from "./acpClient";
