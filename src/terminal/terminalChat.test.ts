@@ -94,7 +94,11 @@ process.stdin.on("data", (c) => {
 writeFileSync(join(dir, "acp"), FAKE);
 writeFileSync(join(dir, "whoami"), FAKE);
 process.chdir(dir); // for the commands that run without a folder of their own (whoami)
-test.after(() => rmSync(dir, { recursive: true, force: true }));
+const startDir = process.cwd();
+test.after(() => {
+  process.chdir(startDir); // Windows won't delete the folder a process is in
+  rmSync(dir, { recursive: true, force: true });
+});
 
 writeFileSync(join(dir, "n.txt"), "remember the milk");
 
