@@ -25,7 +25,7 @@ extension.ts ── activates, registers commands, status bar, terminal profile
 │
 ├─ chatViewProvider.ts  ChatViewProvider: manages chat UIs
 │    │  - any number of editor tabs (WebviewPanel), one ChatSession each
-│    │  - the bottom-panel view (WebviewView), its own ChatSession
+│    │  - the side bar view (WebviewView, in the Activity Bar container `kiroChat`; the icon is the monochrome `media/activity.svg`, which VS Code colours), its own ChatSession
 │    │  - "current chat" for commands = last-used tab or view
 │    └─ chatSession.ts  ChatSession: one conversation
 │         - its own engine process (AcpClient), approvals
@@ -109,7 +109,7 @@ module.
 
 ## Chat lifecycle (webview)
 
-1. A tab or the panel view is created. `ChatSession.attach()` sets the HTML.
+1. A tab or the side bar view is created. `ChatSession.attach()` sets the HTML.
 2. The webview script loads and posts `ready`. The session then starts its
    engine (`ensureStarted`): find `kiro-cli`, `whoami`, resolve the engine,
    spawn `kiro-cli acp --agent-engine v3 --auth-method cli`, `initialize`,
@@ -120,7 +120,7 @@ module.
    recorded in the session's transcript.
 5. The webview stores the current `sessionId` with `vscode.setState`. VS Code
    keeps that state with the tab/view, so after a window reload
-   `deserializeWebviewPanel` (tabs) or `resolveWebviewView` (panel) gets it
+   `deserializeWebviewPanel` (tabs) or `resolveWebviewView` (side bar) gets it
    back and the session reopens it. If the load fails, it starts a new session.
    A renamed chat (`/title`, handled in `ChatSession` before the prompt reaches
    the engine, or **Rename Chat…**) keeps `title` and `defaultTitle` in the
@@ -136,7 +136,7 @@ module.
    the clicked tab's view type. The command gets `{ groupId, editorIndex }`;
    the API has no group ids, so `clickedChat` looks at that index in every
    group for a Kiro chat tab and matches the panel by title and column.
-6. If the panel view is moved and VS Code rebuilds its webview, the same
+6. If the side bar view is moved and VS Code rebuilds its webview, the same
    `ChatSession` replays its transcript into the new webview (`resyncWebview`).
    The transcript lives in memory only, at most 20,000 messages and 32 M JSON
    characters per chat (`chatTranscript.ts`; 32 to 64 MB, as V8 keeps some text at

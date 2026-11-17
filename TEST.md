@@ -37,7 +37,8 @@ Then run **Developer: Reload Window**.
 
 ### Opening chats
 - [ ] `Cmd+Alt+K` and the **Kiro Chat** status-bar item open a chat tab. `Cmd+Shift+K` still deletes the line in an editor.
-- [ ] With `openIn` = `panel`, they open the bottom-panel chat instead.
+- [ ] With `openIn` = `panel`, they open the side bar chat instead.
+- [ ] The Kiro Chat icon in the Activity Bar (left edge) is a ghost that follows the theme colour (light and dark themes, selected and not selected). One click opens the side bar with the chat, whatever `openIn` is. The chat fits the narrow width (toolbar, Resume, Settings, approval cards). Dragging the view to the bottom panel keeps it working, and it stays there after a reload.
 - [ ] Pressing `Cmd+Alt+K` again brings the same tab forward; it doesn't open another.
 - [ ] ＋ (right of Restart) and **New Chat Tab** open "Kiro Chat 2", "Kiro Chat 3", …
 - [ ] A prompt in one tab gets its reply only in that tab. The panel chat is separate too.
@@ -88,7 +89,7 @@ Then run **Developer: Reload Window**.
 - [ ] **Kiro Chat: Rename Chat…** with the tab active: the box shows the name selected. A new name renames it; Esc keeps it; an empty name resets it.
 - [ ] On the phone, typing `/` doesn't offer `/title`. A chat renamed before its engine started (right after a reload) shows the new name in Resume.
 - [ ] Right-click a chat tab that is not the current one: **Rename Chat…** renames that tab, not the current one, also with tabs in two editor groups. On another webview tab (Markdown preview) it says it renames Kiro chat tabs and does nothing.
-- [ ] The same in the bottom-panel chat: the view's title changes, and comes back after a reload.
+- [ ] The same in the side bar chat: the view's title changes, and comes back after a reload.
 - [ ] With remote access on, the phone's chat list shows the new name within a moment. **Resume** in another chat lists the session under the new name.
 - [ ] `/title Foo` typed on the phone goes to the agent as text and does not rename.
 

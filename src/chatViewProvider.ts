@@ -1,4 +1,4 @@
-// Manages the chat UIs: any number of editor-tab chats plus the bottom-panel
+// Manages the chat UIs: any number of editor-tab chats plus the side bar
 // view, each its own conversation (ChatSession) with its own engine.
 
 import * as vscode from "vscode";
@@ -50,7 +50,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly output: vscode.OutputChannel
   ) {}
 
-  /** The bottom-panel chat: its own conversation, kept alive if the view is rebuilt. */
+  /** The side bar chat (it may be moved to the panel): its own conversation, kept alive if the view is rebuilt. */
   resolveWebviewView(
     webviewView: vscode.WebviewView,
     resolveContext: vscode.WebviewViewResolveContext<ChatState>

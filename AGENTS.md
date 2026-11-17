@@ -17,7 +17,7 @@ steps are in [CONTRIBUTING.md](CONTRIBUTING.md), manual checks in
   (ACP → `ChatEvent`), `approvalRules.ts`, `questions.ts`, `fileMentions.ts`,
   `editorContext.ts`, `errorAdvice.ts`, `remote/*` (remote access core, Tailscale and the QR code, pure), `detect.ts`, `cli.ts`, `enginePrep.ts`,
   `types.ts`.
-- Webview chat (editor tabs + panel view): `chatViewProvider.ts`,
+- Webview chat (editor tabs + side bar view): `chatViewProvider.ts`,
   `chatSession.ts` (extension side, with `uiTargets.ts` for its screens) and `webview/*.ts` (browser side, bundled
   to `media/webview.js` and `media/remoteShim.js`, styled by `media/webview.css`).
 - Terminal chat (text mode, a Pseudoterminal): `terminal/*.ts`.
