@@ -139,7 +139,7 @@ export async function resolveEngine(
   }
   throw new Error(
     `No Kiro engine runs on this machine (tried ${engines.join(", ")}). ` +
-      `Check that "${cliPath} chat --agent-engine v3" works, and see the Kiro CLI Chat output for details.`
+      `Check that "${cliPath} chat --agent-engine v3" works, and see the Kiro Chat output for details.`
   );
 }
 

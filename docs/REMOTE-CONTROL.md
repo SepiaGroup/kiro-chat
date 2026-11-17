@@ -22,7 +22,7 @@ a chat from the phone.
 
 1. Tailscale runs on the Mac (it can start at login) and on the phone. Both
    are logged in to your account.
-2. In VS Code run **Kiro CLI Chat: Start Remote Access**. A status bar item
+2. In VS Code run **Kiro Chat: Start Remote Access**. A status bar item
    shows it is on. A card shows the link and a QR code:
    `https://<mac>.<tailnet>.ts.net/#k=<secret>`.
 3. On the phone, open the link. The page swaps the secret for a cookie and
@@ -123,7 +123,7 @@ Approving a command from a phone is code execution on the Mac. If a link
 leaks, the damage is the same as someone sitting at the Mac, so:
 
 - Off by default and per VS Code session: remote access starts only from the
-  command (or `kiroCliChat.remote.autoStart`, off by default). The setting is
+  command (or `kiroChat.remote.autoStart`, off by default). The setting is
   machine-scoped and ignored in an untrusted workspace.
 - The server binds to `127.0.0.1` only. Tailscale is the only way in. No
   option to bind elsewhere.
@@ -149,7 +149,7 @@ leaks, the damage is the same as someone sitting at the Mac, so:
     `confirmAnswer` for chat tabs, and "/" commands through an allow-list.
   - Never: `login`, `newSession`, `pickAttachment`, `attachPaths`, `debugLog`,
     `setAutoApprove`, `remoteAccess`, `remoteLink`.
-- A setting, `kiroCliChat.remote.permissions` (`view`, `prompt`, `approve`),
+- A setting, `kiroChat.remote.permissions` (`view`, `prompt`, `approve`),
   limits a device further. Default: all three, because approving is the point.
 - Text from the phone is untrusted like text from the webview: it goes through
   the same cleaners (`cleanAnswer`, `cleanSteer`, `sanitizeImages`,
@@ -198,9 +198,9 @@ The webview is built for VS Code. Work for a phone browser:
 
 - Commands: **Start Remote Access**, **Stop Remote Access**, **Show Remote
   Access Link** (new pairing code), **Remove Remote Device…**.
-- Settings: `kiroCliChat.remote.autoStart` (false),
-  `kiroCliChat.remote.permissions` (`["view","prompt","approve"]`),
-  `kiroCliChat.remote.port` (0 = pick a free port). All machine-scoped and
+- Settings: `kiroChat.remote.autoStart` (false),
+  `kiroChat.remote.permissions` (`["view","prompt","approve"]`),
+  `kiroChat.remote.port` (0 = pick a free port). All machine-scoped and
   restricted in an untrusted workspace (add to `package.json`
   `restrictedConfigurations`).
 - Status bar: `$(broadcast) Remote: 1 device`; click opens the card.

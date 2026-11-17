@@ -13,8 +13,8 @@ interface ChatState {
 }
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "kiroCliChat.chatView";
-  public static readonly editorViewType = "kiroCliChat.editor";
+  public static readonly viewType = "kiroChat.chatView";
+  public static readonly editorViewType = "kiroChat.editor";
 
   private panelChat?: ChatSession;
   private panelView?: vscode.WebviewView;

@@ -15,7 +15,7 @@ export interface RawConfig {
 }
 
 export function readConfig(): RawConfig {
-  const c = vscode.workspace.getConfiguration("kiroCliChat");
+  const c = vscode.workspace.getConfiguration("kiroChat");
   return {
     cliPath: c.get<string>("kiroCliPath", ""),
     engine: c.get<EngineSetting>("defaultEngine", "auto"),

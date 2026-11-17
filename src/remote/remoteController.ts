@@ -25,8 +25,8 @@ import { DEFAULT_HTTPS_PORT, HTTPS_PORTS, nodeRun, TailscaleServe } from "./tail
 import * as net from "net";
 import { errorMessage } from "../format";
 
-const DEVICES_KEY = "kiroCliChat.remoteDevices";
-const PORT_KEY = "kiroCliChat.remotePort";
+const DEVICES_KEY = "kiroChat.remoteDevices";
+const PORT_KEY = "kiroChat.remotePort";
 /** How long a pairing link works (see PairingCode). */
 const PAIRING_MINUTES = 10;
 /** How often a window looks for the hub and for other windows. */
@@ -95,7 +95,7 @@ export class RemoteController implements vscode.Disposable {
   ) {
     this.tailscale = new TailscaleServe(nodeRun, (line) => this.log(line), listening);
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
-    this.status.command = "kiroCliChat.remoteMenu";
+    this.status.command = "kiroChat.remoteMenu";
   }
 
   get running(): boolean {
@@ -107,7 +107,7 @@ export class RemoteController implements vscode.Disposable {
   }
 
   private settings(): vscode.WorkspaceConfiguration {
-    return vscode.workspace.getConfiguration("kiroCliChat.remote");
+    return vscode.workspace.getConfiguration("kiroChat.remote");
   }
 
   /** The address devices open: the tailnet name when Tailscale shares the port, else this Mac only. */
@@ -120,7 +120,7 @@ export class RemoteController implements vscode.Disposable {
     const wanted = this.settings().get<number>("httpsPort", DEFAULT_HTTPS_PORT);
     const httpsPort = HTTPS_PORTS.includes(wanted) ? wanted : DEFAULT_HTTPS_PORT;
     const result = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: "Kiro CLI Chat: sharing remote access on your tailnet…" },
+      { location: vscode.ProgressLocation.Notification, title: "Kiro Chat: sharing remote access on your tailnet…" },
       () => this.tailscale.expose(this.port, httpsPort)
     );
     if (result.ok) {
@@ -157,7 +157,7 @@ export class RemoteController implements vscode.Disposable {
   private async startServer(): Promise<void> {
     if (!vscode.workspace.isTrusted) {
       void vscode.window.showWarningMessage(
-        "Remote access is off in an untrusted workspace. Trust the workspace first, then run \"Kiro CLI Chat: Start Remote Access\"."
+        "Remote access is off in an untrusted workspace. Trust the workspace first, then run \"Kiro Chat: Start Remote Access\"."
       );
       return;
     }
@@ -424,7 +424,7 @@ export class RemoteController implements vscode.Disposable {
       this.card.reveal();
       return true;
     }
-    const panel = vscode.window.createWebviewPanel("kiroCliChat.remoteCard", "Kiro Remote Access", vscode.ViewColumn.Active, { enableScripts: true });
+    const panel = vscode.window.createWebviewPanel("kiroChat.remoteCard", "Kiro Remote Access", vscode.ViewColumn.Active, { enableScripts: true });
     this.card = panel;
     panel.webview.html = html;
     panel.webview.onDidReceiveMessage((msg) => void this.onCardAction(cardAction(msg)));
@@ -559,10 +559,10 @@ export class RemoteController implements vscode.Disposable {
     const member = this.role === "member";
     this.status.text = member ? "$(broadcast) Remote (shared)" : n > 0 ? `$(broadcast) Remote: ${n} connected` : "$(broadcast) Remote";
     this.status.tooltip = member
-      ? "Kiro CLI Chat remote access is on. This window's chats are shown by the window that shares the address. Click for the pairing link, devices and Stop."
+      ? "Kiro Chat remote access is on. This window's chats are shown by the window that shares the address. Click for the pairing link, devices and Stop."
       : this.publicUrl
-        ? `Kiro CLI Chat remote access is on at ${this.publicUrl}. Click for the pairing link, devices and Stop.`
-        : "Kiro CLI Chat remote access is on for this Mac only (Tailscale is not set up). Click for details, devices and Stop.";
+        ? `Kiro Chat remote access is on at ${this.publicUrl}. Click for the pairing link, devices and Stop.`
+        : "Kiro Chat remote access is on for this Mac only (Tailscale is not set up). Click for details, devices and Stop.";
     this.status.show();
   }
 

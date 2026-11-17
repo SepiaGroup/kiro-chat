@@ -313,7 +313,7 @@ test("Rename Chat from a tab's context menu renames the tab clicked, not the cur
   p.newTab();
   const [t1, t2] = created;
   t2.viewColumn = 2;
-  const chatTab = (label: string) => ({ label, input: new TabInputWebview("mainThreadWebview-kiroCliChat.editor") });
+  const chatTab = (label: string) => ({ label, input: new TabInputWebview("mainThreadWebview-kiroChat.editor") });
   tabGroups.all = [
     { viewColumn: 1, tabs: [{ label: "notes.md", input: {} }, chatTab("Kiro Chat")] },
     { viewColumn: 2, tabs: [chatTab("Kiro Chat 2")] },

@@ -10,7 +10,7 @@ import { TerminalChats } from "./terminal/terminalRemote";
 export function activate(context: vscode.ExtensionContext): void {
   // `log: true` also persists the channel to the extension's log folder, which
   // makes field diagnostics (e.g. drag-and-drop) readable after the fact.
-  const output = vscode.window.createOutputChannel("Kiro CLI Chat", { log: true });
+  const output = vscode.window.createOutputChannel("Kiro Chat", { log: true });
   context.subscriptions.push(output);
   trackActiveEditor(context);
 
@@ -39,20 +39,20 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     remote,
     provider.setRemoteAccess(remote, remote.onDidChange),
-    vscode.commands.registerCommand("kiroCliChat.startRemoteAccess", () => remote.start(true)),
-    vscode.commands.registerCommand("kiroCliChat.stopRemoteAccess", () => remote.stop()),
-    vscode.commands.registerCommand("kiroCliChat.showRemoteLink", () => remote.showLink()),
-    vscode.commands.registerCommand("kiroCliChat.removeRemoteDevice", () => remote.removeDevice()),
-    vscode.commands.registerCommand("kiroCliChat.remoteMenu", () => remote.menu())
+    vscode.commands.registerCommand("kiroChat.startRemoteAccess", () => remote.start(true)),
+    vscode.commands.registerCommand("kiroChat.stopRemoteAccess", () => remote.stop()),
+    vscode.commands.registerCommand("kiroChat.showRemoteLink", () => remote.showLink()),
+    vscode.commands.registerCommand("kiroChat.removeRemoteDevice", () => remote.removeDevice()),
+    vscode.commands.registerCommand("kiroChat.remoteMenu", () => remote.menu())
   );
   void remote.startIfWanted();
 
   const openInPanel = async () => {
-    await vscode.commands.executeCommand("kiroCliChat.chatView.focus");
+    await vscode.commands.executeCommand("kiroChat.chatView.focus");
   };
-  // Open wherever the user prefers (kiroCliChat.openIn).
+  // Open wherever the user prefers (kiroChat.openIn).
   const reveal = async () => {
-    const where = vscode.workspace.getConfiguration("kiroCliChat").get<string>("openIn", "editor");
+    const where = vscode.workspace.getConfiguration("kiroChat").get<string>("openIn", "editor");
     if (where === "panel") {
       await openInPanel();
     } else {
@@ -64,36 +64,36 @@ export function activate(context: vscode.ExtensionContext): void {
   // side bar, and may be closed, so this guarantees a way to reopen it).
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusItem.text = "$(comment-discussion) Kiro Chat";
-  statusItem.tooltip = "Open Kiro CLI Chat (⌘⇧K)";
-  statusItem.command = "kiroCliChat.open";
+  statusItem.tooltip = "Open Kiro Chat (⌘⇧K)";
+  statusItem.command = "kiroChat.open";
   statusItem.show();
   context.subscriptions.push(statusItem);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("kiroCliChat.open", reveal),
-    vscode.commands.registerCommand("kiroCliChat.openInEditor", () => provider.openInEditor()),
-    vscode.commands.registerCommand("kiroCliChat.newChatTab", () => provider.newTab()),
-    vscode.commands.registerCommand("kiroCliChat.openInPanel", openInPanel),
-    vscode.commands.registerCommand("kiroCliChat.newSession", async () => {
+    vscode.commands.registerCommand("kiroChat.open", reveal),
+    vscode.commands.registerCommand("kiroChat.openInEditor", () => provider.openInEditor()),
+    vscode.commands.registerCommand("kiroChat.newChatTab", () => provider.newTab()),
+    vscode.commands.registerCommand("kiroChat.openInPanel", openInPanel),
+    vscode.commands.registerCommand("kiroChat.newSession", async () => {
       await reveal();
       await provider.confirmNewSession();
     }),
-    vscode.commands.registerCommand("kiroCliChat.resumeSession", async () => {
+    vscode.commands.registerCommand("kiroChat.resumeSession", async () => {
       await reveal();
       provider.openResumePanel();
     }),
-    vscode.commands.registerCommand("kiroCliChat.restart", async () => {
+    vscode.commands.registerCommand("kiroChat.restart", async () => {
       await provider.confirmRestart();
     }),
     // From a tab's context menu VS Code passes the tab's place: (resource, { groupId, editorIndex }).
-    vscode.commands.registerCommand("kiroCliChat.renameChat", (_resource?: unknown, tab?: { editorIndex?: unknown }) =>
+    vscode.commands.registerCommand("kiroChat.renameChat", (_resource?: unknown, tab?: { editorIndex?: unknown }) =>
       provider.renameChat(typeof tab?.editorIndex === "number" ? tab.editorIndex : undefined)
     ),
-    vscode.commands.registerCommand("kiroCliChat.login", async () => {
+    vscode.commands.registerCommand("kiroChat.login", async () => {
       await reveal();
       await provider.login();
     }),
-    vscode.commands.registerCommand("kiroCliChat.attach", async () => {
+    vscode.commands.registerCommand("kiroChat.attach", async () => {
       await reveal();
       await provider.pickAttachment();
     })
@@ -130,17 +130,17 @@ function registerTerminalChat(context: vscode.ExtensionContext, output: vscode.O
   }
 
   context.subscriptions.push(
-    vscode.window.registerTerminalProfileProvider("kiroCliChat.terminal", {
+    vscode.window.registerTerminalProfileProvider("kiroChat.terminal", {
       provideTerminalProfile: () => new vscode.TerminalProfile(makeOptions()),
     }),
-    vscode.commands.registerCommand("kiroCliChat.newTerminalChat", () => openChat())
+    vscode.commands.registerCommand("kiroChat.newTerminalChat", () => openChat())
   );
 
   // Context key so Shift+Enter (→ newline) only applies to our terminals.
   const isChat = (t: vscode.Terminal | undefined): boolean =>
     !!t && (t.creationOptions as vscode.ExtensionTerminalOptions).pty instanceof TerminalChat;
   const update = (t: vscode.Terminal | undefined): void => {
-    void vscode.commands.executeCommand("setContext", "kiroCliChat.terminalChatFocused", isChat(t));
+    void vscode.commands.executeCommand("setContext", "kiroChat.terminalChatFocused", isChat(t));
   };
   update(vscode.window.activeTerminal);
   context.subscriptions.push(vscode.window.onDidChangeActiveTerminal(update));

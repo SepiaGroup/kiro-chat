@@ -1,6 +1,6 @@
 # Architecture
 
-How Kiro CLI Chat is built, and the engine behavior it relies on. This is the
+How Kiro Chat is built, and the engine behavior it relies on. This is the
 reference for future work. Everything under "Engine facts" was checked against
 a live `kiro-cli` v3 engine on the target machine (an AVX-less Intel Mac).
 
@@ -80,7 +80,7 @@ extension.ts ── activates, registers commands, status bar, terminal profile
 ├─ sessionList.ts    which saved sessions Resume offers (both UIs)
 ├─ format.ts         small shared formatters (also used by the webview)
 ├─ cli.ts            find kiro-cli, run it, sanitized env
-└─ config.ts         reads kiroCliChat.* settings
+└─ config.ts         reads kiroChat.* settings
 
 webview/ (bundled to media/webview.js, runs inside the webview)
 ├─ main.ts           startup, composer, busy/starting state, routes host messages
@@ -248,7 +248,7 @@ keeps running here. Plan and decisions: `docs/REMOTE-CONTROL.md`.
   - When the hub window closes or stops, its file and lock go (a crash is found by pid), the next tick of another window takes the lock, loads the device list from SecretStorage again and shares the address; pages reconnect to the same tailnet name and their cookies still match the saved devices. A window that is not the hub never touches Tailscale. As a second guard `TailscaleServe.expose` refuses a proxy to another local port that still answers (a window of an older version, say), and overwrites one to a dead port (left by a crash).
   - Tests: `windowRegistry.test.ts` (files, stale entries, the lock) and `hub.test.ts` (two real servers: merged list, streaming with catch-up, messages, policy twice, auth, counts, a window leaving). The controller's own wiring needs VS Code and is checked by hand (TEST.md).
 - The pairing card is a webview panel (`pairingCard.ts` builds its HTML, `remoteController.ts` owns it). Showing it issues a new one-use code (the old one stops working); the link lives in the controller, and the page can only post button names. It is closed when a device pairs or remote access stops. `qr.ts` is a small encoder written for this (about 350 lines). Its tests compare it module for module with another encoder (segno 1.6.1) for every version 1 to 10 at L and M and all eight masks, but only for codes that fill their version: segno adds a stray zero byte before the pad bytes, so shorter codes are checked against the standard's padding rule instead (`dataCodewordList`), and the penalty score is checked against segno's. The codes also decode exactly in OpenCV (all versions, padded and full) and from a screenshot of the card.
-- The settings (`kiroCliChat.remote.*`) have machine scope, so a workspace
+- The settings (`kiroChat.remote.*`) have machine scope, so a workspace
   cannot turn remote access on; it also refuses to start in an untrusted
   workspace.
 
@@ -287,7 +287,7 @@ Transport:
   sets `model`, `autopilot` (`on`/`off`), `effortLevel`, `memoryReflection`,
   `contentCollection`. Setting `model` to an invalid name isn't rejected.
 - The engine starts with autopilot `on`, so the client always syncs it to
-  `kiroCliChat.autopilot`.
+  `kiroChat.autopilot`.
 
 Events (`session/update` and `_meta.kiro`, mapped in `eventMapper.ts`):
 - `agent_message_chunk`, `user_message_chunk`, `tool_call`, `tool_call_update`
@@ -428,7 +428,7 @@ Other CLI calls (`detect.ts`):
 
 ## Security
 
-- `kiroCliChat.kiroCliPath` is `machine` scoped: a workspace's
+- `kiroChat.kiroCliPath` is `machine` scoped: a workspace's
   `.vscode/settings.json` can't make the extension run another binary. A set
   path must be an executable file.
 - `capabilities.untrustedWorkspaces` is `limited`: in Restricted Mode VS Code

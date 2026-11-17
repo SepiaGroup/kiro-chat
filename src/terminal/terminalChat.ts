@@ -307,7 +307,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
       await client
         .setConfigOption("autopilot", cfg.autopilot ? "on" : "off")
         .catch((e) => this.log(`autopilot sync failed: ${errorMessage(e)}`));
-      // v3 rejects --model, so apply kiroCliChat.defaultModel as a session option.
+      // v3 rejects --model, so apply kiroChat.defaultModel as a session option.
       if (prep.engine === "v3" && cfg.model && cfg.model !== "auto") {
         await client
           .setConfigOption("model", cfg.model)
@@ -791,7 +791,7 @@ export class TerminalChat implements vscode.Pseudoterminal {
   private async remoteAccess(action: RemoteAction): Promise<boolean> {
     const id = { start: "startRemoteAccess", link: "showRemoteLink", stop: "stopRemoteAccess" }[action];
     // The link is a secret, so it is shown on a card in the editor, not printed into the terminal's scrollback.
-    const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroCliChat.${id}`);
+    const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroChat.${id}`);
     return action === "stop" || result === true;
   }
 

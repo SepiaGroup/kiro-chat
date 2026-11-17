@@ -165,7 +165,7 @@ export function initDropAndPaste(): void {
     } else if (otherFiles.length > 0 && paths.length === 0) {
       addSystem(
         "VS Code doesn't give the chat a path for files dropped from Finder. " +
-          "Drag it from the VS Code Explorer, or run “Kiro CLI Chat: Attach Image or File” from the Command Palette."
+          "Drag it from the VS Code Explorer, or run “Kiro Chat: Attach Image or File” from the Command Palette."
       );
     }
     inputEl.focus();

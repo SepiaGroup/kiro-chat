@@ -1,6 +1,6 @@
 # Sample Markdown
 
-A sample file for checking how markdown renders in the Kiro CLI Chat view.
+A sample file for checking how markdown renders in the Kiro Chat view.
 
 ## Text formatting
 

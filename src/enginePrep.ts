@@ -32,7 +32,7 @@ export function prepareEngine(
   const promise = (async (): Promise<PreparedEngine> => {
     const cliPath = resolveCliPath(cliPathSetting);
     if (!cliPath) {
-      throw new Error("Could not find the kiro-cli binary. Set kiroCliChat.kiroCliPath in settings.");
+      throw new Error("Could not find the kiro-cli binary. Set kiroChat.kiroCliPath in settings.");
     }
     const auth = await checkAuth(cliPath);
     if (!auth.loggedIn) {
