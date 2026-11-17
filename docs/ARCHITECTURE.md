@@ -475,8 +475,18 @@ a pure function that takes the platform so it is tested everywhere:
 Not verified: that `kiro-cli acp --agent-engine v3 --auth-method cli` and the
 engine's methods behave on Windows as on macOS, how the engine writes folder
 paths in `session/list`, and the terminal chat's keys in Windows Terminal. CI
-runs the compile, lint and the tests on `windows-latest`; that proves nothing
-about the engine.
+runs the compile, lint and the tests on `windows-latest` (324 pass, 24 are
+skipped there). That proves nothing about the real engine. The skipped tests:
+the fake-engine tests in `acpClient.engine.test.ts` and `terminalChat.test.ts`
+(the fake is a `#!` script, which Windows can't start), and three that check
+POSIX facts (the execute bit, file mode bits, macOS's `/private`). In their
+place `acpClient.spawn.test.ts` runs on every platform: it starts node as the
+program, with the fake engine as a file named `acp` in the working folder, and
+checks the arguments, CRLF lines, the PATH and that `dispose()` ends the process.
+
+A backslash is a path separator on Windows, so `tokenize` and `findImagePaths`
+(`terminal/words.ts`) don't treat it as an escape there; a path with spaces
+goes in quotes.
 
 ## Known limits
 
