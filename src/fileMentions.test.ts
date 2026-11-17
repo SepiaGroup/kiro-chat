@@ -1,13 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { homedir } from "os";
-import { join } from "path";
+import { join, resolve } from "path";
 import { expandFileMentions, FileIo, MAX_MENTION_BYTES, mentionNotice } from "./fileMentions";
 
+/** Files by path. The paths are resolved first, as the code under test resolves what it reads ("/w" is "D:\\w" on Windows). */
 function io(files: Record<string, string | Buffer>): FileIo {
+  const byPath = new Map(Object.entries(files).map(([k, v]) => [resolve(k), v]));
   return {
-    fileSize: (p) => (p in files ? Buffer.from(files[p]).length : undefined),
-    read: (p) => Buffer.from(files[p]),
+    fileSize: (p) => (byPath.has(p) ? Buffer.from(byPath.get(p) as string | Buffer).length : undefined),
+    read: (p) => Buffer.from(byPath.get(p) as string | Buffer),
   };
 }
 

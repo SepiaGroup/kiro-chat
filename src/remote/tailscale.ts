@@ -192,7 +192,9 @@ export class TailscaleServe {
     private readonly run: Run = nodeRun,
     private readonly log: (line: string) => void = () => undefined,
     /** Whether a local port still has a server (required: without it, a live share of another window could be taken). */
-    private readonly isAlive: (port: number) => Promise<boolean>
+    private readonly isAlive: (port: number) => Promise<boolean>,
+    /** Where to look for the CLI (tests). */
+    private readonly candidates: readonly string[] = CLI_CANDIDATES
   ) {}
 
   get active(): boolean {
@@ -200,7 +202,7 @@ export class TailscaleServe {
   }
 
   async expose(localPort: number, httpsPort: number = DEFAULT_HTTPS_PORT): Promise<ExposeResult> {
-    this.cli ??= await findCli(this.run);
+    this.cli ??= await findCli(this.run, this.candidates);
     if (!this.cli) {
       return {
         ok: false,

@@ -16,7 +16,7 @@ test("on Windows the same folder compares equal however it is written", () => {
   assert.notEqual(normalizePath("C:\\Users\\me\\app2", "win32"), a);
 });
 
-test("normalizePath drops trailing slashes and /private", () => {
+test("normalizePath drops trailing slashes and /private", { skip: process.platform === "win32" }, () => {
   assert.equal(normalizePath("/private/tmp/x/"), "/tmp/x");
   assert.equal(normalizePath("/"), "/");
 });

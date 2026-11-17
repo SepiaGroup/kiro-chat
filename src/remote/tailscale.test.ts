@@ -20,6 +20,10 @@ function fake(handlers: Record<string, (args: string[]) => RunResult>, present =
   return { run, calls };
 }
 
+/** A TailscaleServe that looks where the fake is: the macOS list, whatever machine runs the test. */
+const mac = (run: Run, log: ((line: string) => void) | undefined, isAlive: (port: number) => Promise<boolean>) =>
+  new TailscaleServe(run, log, isAlive, cliCandidates("darwin"));
+
 test("the commands are exactly these", () => {
   assert.deepEqual(serveArgs(51234), ["serve", "--bg", "--https=8443", "http://127.0.0.1:51234"]);
   assert.deepEqual(unserveArgs(), ["serve", "--https=8443", "off"]);
@@ -30,8 +34,8 @@ test("the commands are exactly these", () => {
 
 test("the CLI is found on PATH, in /usr/local/bin or in the app", async () => {
   const f = fake({}, ["/Applications/Tailscale.app/Contents/MacOS/Tailscale"]);
-  assert.equal(await findCli(f.run), "/Applications/Tailscale.app/Contents/MacOS/Tailscale");
-  assert.equal(await findCli(fake({}, []).run), undefined);
+  assert.equal(await findCli(f.run, cliCandidates("darwin")), "/Applications/Tailscale.app/Contents/MacOS/Tailscale");
+  assert.equal(await findCli(fake({}, []).run, cliCandidates("darwin")), undefined);
 });
 
 test("status: running with certificates, running without, and the states that need the user", () => {
@@ -74,7 +78,7 @@ test("the output of serve, as seen on a tailnet where Serve was off", () => {
 
 test("expose: runs serve for the local port and gives the tailnet address", async () => {
   const f = fake({ "status": () => ok(status("Running")), "serve status": () => ok("{}"), serve: () => ok("Available within your tailnet") });
-  const t = new TailscaleServe(f.run, undefined, async () => false);
+  const t = mac(f.run, undefined, async () => false);
   const r = await t.expose(51234);
   assert.deepEqual(r, { ok: true, url: "https://michaels-mac-pro.taila1bfeb.ts.net:8443" });
   assert.ok(f.calls.includes("/usr/local/bin/tailscale serve --bg --https=8443 http://127.0.0.1:51234"));
@@ -82,10 +86,10 @@ test("expose: runs serve for the local port and gives the tailnet address", asyn
 });
 
 test("expose: says why it cannot, and runs nothing it should not", async () => {
-  assert.match(((await new TailscaleServe(fake({}, []).run, undefined, async () => false).expose(1)) as { advice: string }).advice, /not installed/);
+  assert.match(((await mac(fake({}, []).run, undefined, async () => false).expose(1)) as { advice: string }).advice, /not installed/);
 
   const loggedOut = fake({ status: () => ok(status("NeedsLogin")) });
-  const r1 = await new TailscaleServe(loggedOut.run, undefined, async () => false).expose(1);
+  const r1 = await mac(loggedOut.run, undefined, async () => false).expose(1);
   assert.match((r1 as { advice: string }).advice, /not logged in/);
   assert.ok(!loggedOut.calls.some((c) => c.includes("--bg")));
 
@@ -93,7 +97,7 @@ test("expose: says why it cannot, and runs nothing it should not", async () => {
     status: () => ok(status("Running")),
     "serve status": () => ok(JSON.stringify({ Web: { "michaels-mac-pro.taila1bfeb.ts.net:8443": { Handlers: { "/": { Path: "/tmp" } } } } })),
   });
-  const r2 = await new TailscaleServe(busy.run, undefined, async () => false).expose(1);
+  const r2 = await mac(busy.run, undefined, async () => false).expose(1);
   assert.match((r2 as { advice: string }).advice, /already used/);
   assert.ok(!busy.calls.some((c) => c.includes("--bg")));
 
@@ -102,7 +106,7 @@ test("expose: says why it cannot, and runs nothing it should not", async () => {
     "serve status": () => ok("{}"),
     serve: () => ({ code: null, timedOut: true, stderr: "", stdout: "Serve is not enabled on your tailnet.\nTo enable, visit:\n https://login.tailscale.com/f/serve?node=abc\n" }),
   });
-  const t = new TailscaleServe(notEnabled.run, undefined, async () => false);
+  const t = mac(notEnabled.run, undefined, async () => false);
   const r3 = await t.expose(1);
   assert.equal(r3.ok, false);
   assert.equal((r3 as { enableUrl?: string }).enableUrl, "https://login.tailscale.com/f/serve?node=abc");
@@ -111,7 +115,7 @@ test("expose: says why it cannot, and runs nothing it should not", async () => {
 
 test("remove takes down only what expose set up, once", async () => {
   const f = fake({ status: () => ok(status("Running")), "serve status": () => ok("{}"), serve: () => ok() });
-  const t = new TailscaleServe(f.run, undefined, async () => false);
+  const t = mac(f.run, undefined, async () => false);
   await t.remove(); // nothing exposed: runs nothing
   assert.ok(!f.calls.some((c) => c.includes("off")));
   await t.expose(1, 10000);
@@ -130,19 +134,19 @@ test("a proxy to another local port that still answers is not taken over; a dead
 
   const probed: number[] = [];
   const live = fake(handlers);
-  const refused = await new TailscaleServe(live.run, undefined, async (p) => (probed.push(p), true)).expose(50000);
+  const refused = await mac(live.run, undefined, async (p) => (probed.push(p), true)).expose(50000);
   assert.equal(refused.ok, false);
   assert.match((refused as { advice: string }).advice, /already shared .*local port 40000/);
   assert.deepEqual(probed, [40000]);
   assert.ok(!live.calls.some((c) => c.includes("--bg")), "nothing was changed");
 
   const dead = fake(handlers);
-  assert.equal((await new TailscaleServe(dead.run, undefined, async () => false).expose(50000)).ok, true);
+  assert.equal((await mac(dead.run, undefined, async () => false).expose(50000)).ok, true);
   assert.ok(dead.calls.some((c) => c.includes("--bg --https=8443 http://127.0.0.1:50000")));
 
   // Our own port again (a restart on the same port) is just ours.
   const same = fake(handlers);
-  assert.equal((await new TailscaleServe(same.run, undefined, async () => true).expose(40000)).ok, true);
+  assert.equal((await mac(same.run, undefined, async () => true).expose(40000)).ok, true);
 });
 
 test("on Windows the Tailscale CLI is tried on PATH, then in Program Files", () => {

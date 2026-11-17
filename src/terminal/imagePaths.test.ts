@@ -4,26 +4,41 @@ import * as os from "os";
 import * as path from "path";
 import { findImagePaths, sniffImageMime } from "./imagePaths";
 
+const WIN = process.platform === "win32";
+const n = (p: string): string => path.normalize(p);
+
 test("finds quoted, escaped, home, relative and file:// image paths", () => {
+  // A backslash escapes a space on macOS and Linux; on Windows it is the separator, so the space is quoted there.
+  const spaced = WIN ? '"/tmp/a b.JPG"' : "/tmp/a\\ b.JPG";
+  const url = WIN ? "file:///C:/tmp/e.jpeg" : "file:///tmp/e.jpeg";
   const text =
-    "what is in '/Users/me/Desktop/Screenshot 1.png' and /tmp/a\\ b.JPG " +
-    "and ~/pics/c.webp, ./d.gif plus file:///tmp/e.jpeg?";
+    `what is in '/Users/me/Desktop/Screenshot 1.png' and ${spaced} ` +
+    `and ~/pics/c.webp, ./d.gif plus ${url}?`;
   assert.deepEqual(findImagePaths(text, "/work"), [
-    "/Users/me/Desktop/Screenshot 1.png",
-    "/tmp/a b.JPG",
+    n("/Users/me/Desktop/Screenshot 1.png"),
+    n("/tmp/a b.JPG"),
     path.join(os.homedir(), "pics/c.webp"),
-    "/work/d.gif",
-    "/tmp/e.jpeg",
+    path.resolve("/work", "d.gif"),
+    n(WIN ? "C:/tmp/e.jpeg" : "/tmp/e.jpeg"),
   ]);
 });
 
 test("ignores non-image paths, plain words and duplicates", () => {
   assert.deepEqual(findImagePaths("edit /src/a.ts and say png", "/w"), []);
-  assert.deepEqual(findImagePaths("/x/y.png /x/y.png", "/w"), ["/x/y.png"]);
+  assert.deepEqual(findImagePaths("/x/y.png /x/y.png", "/w"), [n("/x/y.png")]);
 });
 
 test("bare file name in the working folder counts", () => {
-  assert.deepEqual(findImagePaths("look at logo.png please", "/w"), ["/w/logo.png"]);
+  assert.deepEqual(findImagePaths("look at logo.png please", "/w"), [path.resolve("/w", "logo.png")]);
+});
+
+// Needs Windows' own path rules, so it runs only there (CI has a Windows job).
+test("on Windows a typed or dragged C:\\ path keeps its backslashes", { skip: !WIN }, () => {
+  assert.deepEqual(findImagePaths('see C:\\Users\\me\\a.png and "C:\\My Pics\\b.JPG" and ~\\c.gif', "C:\\w"), [
+    "C:\\Users\\me\\a.png",
+    "C:\\My Pics\\b.JPG",
+    path.join(os.homedir(), "c.gif"),
+  ]);
 });
 
 test("sniffImageMime checks the file's first bytes", () => {

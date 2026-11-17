@@ -1,6 +1,8 @@
 // Slash commands of the terminal chat (mirrors kiro-cli's set) and the
 // "type / for help" menu logic. Pure (no vscode import) so it can be tested.
 
+import { unescapeWord, wordPattern } from "./words";
+
 export interface SubSpec {
   name: string;
   /** Usage of the rest of the line after the subcommand, e.g. "<path>". */
@@ -157,12 +159,12 @@ export function findCommand(name: string, commands: CommandSpec[] = COMMANDS): C
 }
 
 /** Split arguments, honoring 'single' / "double" quotes and backslash escapes. */
-export function tokenize(arg: string): string[] {
+export function tokenize(arg: string, platform: NodeJS.Platform = process.platform): string[] {
   const out: string[] = [];
-  const re = /'([^']*)'|"([^"]*)"|((?:\\.|[^\s'"])+)/g;
+  const re = wordPattern(platform);
   let m: RegExpExecArray | null;
   while ((m = re.exec(arg)) !== null) {
-    out.push(m[1] ?? m[2] ?? (m[3] ?? "").replace(/\\(.)/g, "$1"));
+    out.push(m[1] ?? m[2] ?? unescapeWord(m[3] ?? "", platform));
   }
   return out;
 }

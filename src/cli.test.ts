@@ -5,7 +5,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { candidateCliPaths, executableProblem, pickFromWhere, resolveCliPath, sanitizedEnv } from "./cli";
 
-test("a configured kiro-cli path must be an executable file", () => {
+// Windows has no execute bit: a file there is "executable" if its name says so.
+test("a configured kiro-cli path must be an executable file", { skip: process.platform === "win32" }, () => {
   const dir = mkdtempSync(join(tmpdir(), "kiro-cli-"));
   try {
     const exe = join(dir, "kiro-cli");

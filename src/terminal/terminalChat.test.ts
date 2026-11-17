@@ -2,7 +2,15 @@
 // kiro-cli (whoami + an ACP engine) drive a real TerminalChat through a turn
 // with streamed text, a tool call, an approval and the footer.
 
-import { test } from "node:test";
+import { test as nodeTest } from "node:test";
+
+// The fake engine is a script that starts through its #! line, which Windows
+// can't do. The transport on Windows is covered by acpClient.spawn.test.ts.
+const test = Object.assign(
+  (name: string, fn: () => void | Promise<void>) =>
+    nodeTest(name, { skip: process.platform === "win32" ? "the fake engine needs a #! line" : false }, fn),
+  { after: nodeTest.after }
+);
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "fs";
