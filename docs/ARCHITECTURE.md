@@ -25,7 +25,7 @@ extension.ts ── activates, registers commands, status bar, terminal profile
 │
 ├─ chatViewProvider.ts  ChatViewProvider: manages chat UIs
 │    │  - any number of editor tabs (WebviewPanel), one ChatSession each
-│    │  - the side bar view (WebviewView, in the Activity Bar container `kiroChat`; the icon is the monochrome `media/activity.svg`, which VS Code colours), its own ChatSession
+│    │  - the side bar view (WebviewView, in the Activity Bar container `kiroChat`; the icon is the monochrome `media/activity.svg`, which VS Code colours; the editor title button has a light and a dark copy, `media/button-*.svg`, because menu icons aren't recoloured. All three are the official `kiro.svg` mark with padding), its own ChatSession
 │    │  - "current chat" for commands = last-used tab or view
 │    └─ chatSession.ts  ChatSession: one conversation
 │         - its own engine process (AcpClient), approvals
