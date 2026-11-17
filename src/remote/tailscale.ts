@@ -15,6 +15,8 @@
 //   (empty until HTTPS certificates are enabled for the tailnet).
 
 import { execFile } from "child_process";
+import { win32 } from "path";
+import { machine } from "../machine";
 
 export interface RunResult {
   /** Exit code; null when the command was killed. */
@@ -32,7 +34,7 @@ export type Run = (cli: string, args: string[], timeoutMs: number) => Promise<Ru
  */
 export function cliCandidates(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): string[] {
   if (platform === "win32") {
-    return ["tailscale", `${env.ProgramFiles || "C:\\Program Files"}\\Tailscale\\tailscale.exe`];
+    return ["tailscale", win32.join(env.ProgramFiles || "C:\\Program Files", "Tailscale", "tailscale.exe")];
   }
   return [
     "tailscale",
@@ -41,7 +43,6 @@ export function cliCandidates(platform: NodeJS.Platform = process.platform, env:
     "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
   ];
 }
-export const CLI_CANDIDATES: readonly string[] = cliCandidates();
 
 /** HTTPS ports `tailscale serve` accepts. 8443 leaves 443 to whatever the user serves already. */
 export const HTTPS_PORTS: readonly number[] = [443, 8443, 10000];
@@ -62,7 +63,7 @@ export const nodeRun: Run = (cli, args, timeoutMs) =>
   });
 
 /** The first candidate that answers `version`. */
-export async function findCli(run: Run, candidates: readonly string[] = CLI_CANDIDATES): Promise<string | undefined> {
+export async function findCli(run: Run, candidates: readonly string[] = cliCandidates()): Promise<string | undefined> {
   for (const c of candidates) {
     const r = await run(c, ["version"], 5000);
     if (r.code === 0) {
@@ -97,7 +98,7 @@ export function parseStatus(stdout: string): TailscaleState {
   }
   const name = typeof j.Self?.DNSName === "string" ? j.Self.DNSName.replace(/\.$/, "").toLowerCase() : "";
   if (!name) {
-    return { kind: "unavailable", advice: "This Mac has no Tailscale name. Turn on MagicDNS in the Tailscale admin console (DNS page)." };
+    return { kind: "unavailable", advice: `This ${machine()} has no Tailscale name. Turn on MagicDNS in the Tailscale admin console (DNS page).` };
   }
   return { kind: "ready", dnsName: name, certsEnabled: Array.isArray(j.CertDomains) && j.CertDomains.length > 0 };
 }
@@ -194,7 +195,7 @@ export class TailscaleServe {
     /** Whether a local port still has a server (required: without it, a live share of another window could be taken). */
     private readonly isAlive: (port: number) => Promise<boolean>,
     /** Where to look for the CLI (tests). */
-    private readonly candidates: readonly string[] = CLI_CANDIDATES
+    private readonly candidates: readonly string[] = cliCandidates()
   ) {}
 
   get active(): boolean {
@@ -207,7 +208,7 @@ export class TailscaleServe {
       return {
         ok: false,
         advice:
-          "Tailscale is not installed on this computer (no tailscale command found). Install it from tailscale.com/download, log in, then start remote access again.",
+          `Tailscale is not installed on this ${machine()} (no tailscale command found). Install it from tailscale.com/download, log in, then start remote access again.`,
       };
     }
     const cli = this.cli;

@@ -13,7 +13,8 @@
 export function wordPattern(platform: NodeJS.Platform = process.platform, oneLine = false): RegExp {
   const quoted = oneLine ? "[^'\\n]+" : "[^']*";
   const dquoted = oneLine ? '[^"\\n]+' : '[^"]*';
-  const bare = platform === "win32" ? "[^\\s'\"]+" : "(?:\\\\.|[^\\s'\"])+";
+  // On Windows an apostrophe inside a word stays in it (it's.png); one that starts a word opens a quote.
+  const bare = platform === "win32" ? "[^\\s'\"][^\\s\"]*" : "(?:\\\\.|[^\\s'\"])+";
   return new RegExp(`'(${quoted})'|"(${dquoted})"|(${bare})`, "g");
 }
 

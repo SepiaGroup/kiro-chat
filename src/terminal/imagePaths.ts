@@ -5,6 +5,7 @@
 import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { homeRest } from "../homePath";
 import { unescapeWord, wordPattern } from "./words";
 
 export const IMAGE_MIME_BY_EXT: Record<string, string> = {
@@ -47,7 +48,13 @@ export function imageMimeForPath(p: string): string | undefined {
  * spaces, ~/ paths, paths relative to `cwd`, and file:// URIs. Existence is
  * not checked here.
  */
-export function findImagePaths(text: string, cwd: string, platform: NodeJS.Platform = process.platform): string[] {
+export function findImagePaths(
+  text: string,
+  cwd: string,
+  platform: NodeJS.Platform = process.platform,
+  home: string = os.homedir()
+): string[] {
+  const pm = platform === "win32" ? path.win32 : path.posix;
   const out: string[] = [];
   const seen = new Set<string>();
   const re = wordPattern(platform, true);
@@ -63,22 +70,23 @@ export function findImagePaths(text: string, cwd: string, platform: NodeJS.Platf
       continue;
     }
     let p = token;
+    const rest = homeRest(p, platform);
     if (p.startsWith("file://")) {
       try {
-        p = fileURLToPath(p);
+        p = fileURLToPath(p, { windows: platform === "win32" });
       } catch {
         continue;
       }
-    } else if (p === "~" || /^~[\\/]/.test(p)) {
-      p = path.join(os.homedir(), p.slice(1));
-    } else if (!path.isAbsolute(p)) {
+    } else if (p === "~" || rest !== undefined) {
+      p = pm.join(home, rest ?? "");
+    } else if (!pm.isAbsolute(p)) {
       // Only treat it as a relative path if it looks like one.
       if (!/[\\/]/.test(p) && !/^[\w.-]+\.\w+$/.test(p)) {
         continue;
       }
-      p = path.resolve(cwd, p);
+      p = pm.resolve(cwd, p);
     }
-    p = path.normalize(p);
+    p = pm.normalize(p);
     if (!seen.has(p)) {
       seen.add(p);
       out.push(p);

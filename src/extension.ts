@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { ChatViewProvider } from "./chatViewProvider";
 import { trackActiveEditor } from "./config";
 import { RemoteController } from "./remote/remoteController";
+import { shortcutLabel } from "./shortcut";
 import { TerminalChat } from "./terminal/terminalChat";
 import { TerminalChats } from "./terminal/terminalRemote";
 
@@ -64,7 +65,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // side bar, and may be closed, so this guarantees a way to reopen it).
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusItem.text = "$(comment-discussion) Kiro Chat";
-  statusItem.tooltip = `Open Kiro Chat (${process.platform === "darwin" ? "⌘⌥K" : "Ctrl+Alt+K"})`;
+  const shortcut = shortcutLabel(context.extension.packageJSON?.contributes?.keybindings, "kiroChat.open");
+  statusItem.tooltip = shortcut ? `Open Kiro Chat (${shortcut})` : "Open Kiro Chat";
   statusItem.command = "kiroChat.open";
   statusItem.show();
   context.subscriptions.push(statusItem);

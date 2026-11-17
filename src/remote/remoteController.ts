@@ -24,6 +24,7 @@ import { encodeQr, qrSvg } from "./qr";
 import { DEFAULT_HTTPS_PORT, HTTPS_PORTS, nodeRun, TailscaleServe } from "./tailscale";
 import * as net from "net";
 import { errorMessage } from "../format";
+import { machine } from "../machine";
 
 const DEVICES_KEY = "kiroChat.remoteDevices";
 const PORT_KEY = "kiroChat.remotePort";
@@ -110,7 +111,7 @@ export class RemoteController implements vscode.Disposable {
     return vscode.workspace.getConfiguration("kiroChat.remote");
   }
 
-  /** The address devices open: the tailnet name when Tailscale shares the port, else this computer only. */
+  /** The address devices open: the tailnet name when Tailscale shares the port, else this Mac only. */
   private baseUrl(): string {
     return this.publicUrl ?? `http://127.0.0.1:${this.port}`;
   }
@@ -188,7 +189,7 @@ export class RemoteController implements vscode.Disposable {
         void vscode.window.showInformationMessage(`Remote access: ${d.name} is paired.`);
       },
       onClients: () => this.updateStatus(),
-      // Only this computer and the tailnet name may be the Host: no other name reaches the page.
+      // Only this Mac and the tailnet name may be the Host: no other name reaches the page.
       allowedHosts: () => (this.publicUrl ? [new URL(this.publicUrl).hostname] : []),
       log: (line) => this.log(line),
     });
@@ -562,7 +563,7 @@ export class RemoteController implements vscode.Disposable {
       ? "Kiro Chat remote access is on. This window's chats are shown by the window that shares the address. Click for the pairing link, devices and Stop."
       : this.publicUrl
         ? `Kiro Chat remote access is on at ${this.publicUrl}. Click for the pairing link, devices and Stop.`
-        : "Kiro Chat remote access is on for this computer only (Tailscale is not set up). Click for details, devices and Stop.";
+        : `Kiro Chat remote access is on for this ${machine()} only (Tailscale is not set up). Click for details, devices and Stop.`;
     this.status.show();
   }
 

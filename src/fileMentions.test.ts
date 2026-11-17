@@ -26,10 +26,12 @@ test("absolute paths work; text without mentions is untouched", () => {
   assert.equal(m.text, '<attached_file path="/x/n.txt"> n </attached_file>');
 });
 
-test("~/ and ~\\ both mean the home folder", () => {
+test("~/ is the home folder, and ~\\ too on Windows only", () => {
   const files = { [join(homedir(), "n.txt")]: "n" };
   assert.deepEqual(expandFileMentions("@file:~/n.txt", "/w", io(files)).attached, ["~/n.txt"]);
-  assert.deepEqual(expandFileMentions("@file:~\\n.txt", "/w", io(files)).attached, ["~\\n.txt"]);
+  // On macOS a backslash is an ordinary character: this names a file in the working folder, which doesn't exist.
+  const attached = expandFileMentions("@file:~\\n.txt", "/w", io(files)).attached;
+  assert.deepEqual(attached, process.platform === "win32" ? ["~\\n.txt"] : []);
 });
 
 test("a mention that can't be attached stays as typed, with a reason", () => {

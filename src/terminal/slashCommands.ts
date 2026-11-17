@@ -2,6 +2,7 @@
 // "type / for help" menu logic. Pure (no vscode import) so it can be tested.
 
 import { unescapeWord, wordPattern } from "./words";
+import { machine } from "../machine";
 
 export interface SubSpec {
   name: string;
@@ -150,7 +151,7 @@ export const COMMANDS: CommandSpec[] = [
   // In kiro-cli, but not possible here.
   { name: "guide", desc: "Guide agent", unavailable: "The engine doesn't include the guide agent. Type /help for commands." },
   { name: "goal", args: "<goal>", desc: "Iterate toward a goal", unavailable: "Goals aren't enabled for this kind of engine connection." },
-  { name: "voice", desc: "Voice input", unavailable: "Voice input needs the kiro-cli terminal app, which can't run on this computer." },
+  { name: "voice", desc: "Voice input", unavailable: `Voice input needs the kiro-cli terminal app, which can't run on this ${machine()}.` },
 ];
 
 export function findCommand(name: string, commands: CommandSpec[] = COMMANDS): CommandSpec | undefined {

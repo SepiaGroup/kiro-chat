@@ -4,6 +4,7 @@
 
 import { style } from "./terminal/ansi";
 import { COMMANDS, findCommand, type CommandSpec } from "./terminal/slashCommands";
+import { machine } from "./machine";
 
 /** Terminal chat commands a chat tab doesn't run, and what to do instead. */
 export const TAB_UNAVAILABLE: Record<string, string> = {
@@ -18,7 +19,7 @@ export const TAB_UNAVAILABLE: Record<string, string> = {
 
 /**
  * What a remote device may run: an allow-list, so a new command is blocked
- * until it is decided here. Left out is whatever acts on the computer itself:
+ * until it is decided here. Left out is whatever acts on the Mac itself:
  * opens an editor, a dialog or a terminal there, writes a file to a path the
  * device names, reads a path into the context, or touches the clipboard.
  */
@@ -28,11 +29,11 @@ const REMOTE_ALLOWED = new Set([
   "chat", "context", "knowledge", "agent", "tools", "autopilot", "set",
 ]);
 
-/** Allowed first words of the argument, for the commands that are only partly allowed (the rest names a path on the computer or opens something). */
+/** Allowed first words of the argument, for the commands that are only partly allowed (the rest names a path on the Mac or opens something). */
 const REMOTE_SUBS: Record<string, { subs: string[]; why: string }> = {
-  chat: { subs: ["", "new", "load"], why: "/chat save writes a file on the computer." },
-  context: { subs: ["", "show", "remove", "clear"], why: "/context add reads a path on the computer into the context." },
-  knowledge: { subs: ["", "show", "remove", "clear", "cancel"], why: "/knowledge add and update read a path on the computer." },
+  chat: { subs: ["", "new", "load"], why: `/chat save writes a file on the ${machine()}.` },
+  context: { subs: ["", "show", "remove", "clear"], why: `/context add reads a path on the ${machine()} into the context.` },
+  knowledge: { subs: ["", "show", "remove", "clear", "cancel"], why: `/knowledge add and update read a path on the ${machine()}.` },
 };
 
 /** Settings a device may change with /set (the Settings panel's), and the one that takes approvals away. */
@@ -43,7 +44,7 @@ export type RemoteCheck = { ok: true; needsApprove?: boolean } | { ok: false; re
 /** Whether a remote device may run this command, and whether it also needs the approve permission (anything that turns Autopilot on or off). */
 export function remoteCheck(name: string, arg: string): RemoteCheck {
   if (!REMOTE_ALLOWED.has(name)) {
-    return { ok: false, reason: `/${name} acts on the computer itself (an editor, a terminal, a file or the clipboard there), so it isn't available from a remote device.` };
+    return { ok: false, reason: `/${name} acts on the ${machine()} itself (an editor, a terminal, a file or the clipboard there), so it isn't available from a remote device.` };
   }
   const words = arg.trim().split(/\s+/);
   const sub = (words[0] ?? "").toLowerCase();
@@ -52,7 +53,7 @@ export function remoteCheck(name: string, arg: string): RemoteCheck {
     return { ok: false, reason: `${partly.why} It isn't available from a remote device.` };
   }
   if (name === "agent" && (sub === "create" || sub === "edit")) {
-    return { ok: false, reason: `/agent ${sub} opens a file in VS Code on the computer, so it isn't available from a remote device.` };
+    return { ok: false, reason: `/agent ${sub} opens a file in VS Code on the ${machine()}, so it isn't available from a remote device.` };
   }
   if (name === "autopilot") {
     return sub ? { ok: true, needsApprove: true } : { ok: true };
