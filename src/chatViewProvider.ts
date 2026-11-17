@@ -12,6 +12,9 @@ interface ChatState {
   defaultTitle?: string;
 }
 
+/** The side bar chat's own name (editor tabs are "Kiro Chat", "Kiro Chat 2", …). It shows on the remote device and in the log. */
+const SIDE_BAR_CHAT_NAME = "Kiro Chat (side bar)";
+
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "kiroChat.chatView";
   public static readonly editorViewType = "kiroChat.editor";
@@ -59,7 +62,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.panelChat = new ChatSession(
         this.context,
         this.output,
-        "panel",
+        SIDE_BAR_CHAT_NAME,
         this.hooks,
         sessionIdOf(resolveContext.state),
         titleOf(resolveContext.state)

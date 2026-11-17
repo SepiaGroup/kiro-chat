@@ -182,6 +182,7 @@ test("the bottom-panel view is a separate chat that survives a rebuild", async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   assert.notEqual(panelChat, (p as any).tabs.get(created[0]));
   assert.equal(panelChat.resumeSessionId, "sess_panel");
+  assert.equal(panelChat.title, "Kiro Chat (side bar)");
 
   view1.webview.messages.fire({ type: "resumeSession" });
   await tick();
