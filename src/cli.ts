@@ -4,7 +4,7 @@
 import { spawn, spawnSync } from "child_process";
 import { accessSync, constants, existsSync, statSync } from "fs";
 import { homedir } from "os";
-import { delimiter, join, win32 } from "path";
+import { join, win32 } from "path";
 
 /**
  * Candidate locations checked when no explicit path is configured. On Windows
@@ -24,23 +24,34 @@ export function candidateCliPaths(
 }
 
 /**
- * The program from the output of `where kiro-cli` (one path per line). Prefers a
- * `.exe`: a `.cmd` or `.bat` can't be started without a shell.
+ * The `.exe` in the output of `where kiro-cli` (one path per line). A `.cmd`,
+ * `.bat` or a file with no extension can't be started without a shell, so those
+ * are ignored and the search goes on with the known install folders.
  */
 export function pickFromWhere(stdout: string): string | undefined {
-  const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
-  return lines.find((l) => /\.exe$/i.test(l)) ?? lines[0];
+  return stdout
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => /\.exe$/i.test(l));
 }
 
+/** Time allowed to look for kiro-cli: a slow login shell or a network drive on PATH must not hang the chat. */
+const WHERE_TIMEOUT_MS = 5000;
+const LOGIN_SHELL_TIMEOUT_MS = 10000; // a login shell may run a heavy profile
+
 /** Where kiro-cli is on PATH, or undefined. A login shell on macOS and Linux, `where` on Windows. */
-function findOnPath(platform: NodeJS.Platform = process.platform): string | undefined {
+export function findOnPath(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  spawnFn: typeof spawnSync = spawnSync
+): string | undefined {
   if (platform === "win32") {
     // The full path, so a PATH that VS Code was started with can't hide where.exe.
-    const where = win32.join(process.env.SystemRoot || "C:\\Windows", "System32", "where.exe");
-    const r = spawnSync(where, ["kiro-cli"], { encoding: "utf8", windowsHide: true });
+    const where = win32.join(env.SystemRoot || "C:\\Windows", "System32", "where.exe");
+    const r = spawnFn(where, ["kiro-cli"], { encoding: "utf8", windowsHide: true, timeout: WHERE_TIMEOUT_MS });
     return r.status === 0 ? pickFromWhere(r.stdout) : undefined;
   }
-  const r = spawnSync("bash", ["-lc", "command -v kiro-cli"], { encoding: "utf8" });
+  const r = spawnFn("bash", ["-lc", "command -v kiro-cli"], { encoding: "utf8", timeout: LOGIN_SHELL_TIMEOUT_MS });
   const p = r.status === 0 ? r.stdout.trim() : "";
   return p.length > 0 ? p : undefined;
 }
@@ -150,7 +161,8 @@ export function runCli(
  * `process.env` is a plain object, and on Windows its variable is named `Path`,
  * so the PATH key is found without regard to case and keeps its own name.
  */
-export function sanitizedEnv(base: NodeJS.ProcessEnv = process.env, sep: string = delimiter): NodeJS.ProcessEnv {
+export function sanitizedEnv(base: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
+  const sep = platform === "win32" ? ";" : ":";
   const env = { ...base };
   const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
   env[key] = (env[key] ?? "")

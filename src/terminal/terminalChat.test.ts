@@ -2,21 +2,14 @@
 // kiro-cli (whoami + an ACP engine) drive a real TerminalChat through a turn
 // with streamed text, a tool call, an approval and the footer.
 
-import { test as nodeTest } from "node:test";
-
-// The fake engine is a script that starts through its #! line, which Windows
-// can't do. The transport on Windows is covered by acpClient.spawn.test.ts.
-const test = Object.assign(
-  (name: string, fn: () => void | Promise<void>) =>
-    nodeTest(name, { skip: process.platform === "win32" ? "the fake engine needs a #! line" : false }, fn),
-  { after: nodeTest.after }
-);
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import Module from "node:module";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { stripAnsi } from "./ansi";
+import { removeTempDir } from "../testTemp";
 
 class Emitter<T> {
   private listeners: Array<(v: T) => void> = [];
@@ -33,13 +26,12 @@ class Emitter<T> {
 }
 
 const dir = mkdtempSync(join(tmpdir(), "kiro-term-"));
-const cli = join(dir, "kiro-cli");
-writeFileSync(
-  cli,
-  `#!/usr/bin/env node
-const args = process.argv.slice(2);
-if (args[0] === "whoami") { console.log(JSON.stringify({ email: "test@example.com" })); process.exit(0); }
-if (args[0] !== "acp") process.exit(2);
+// The program is node, and the fake is the file named by its first argument ("whoami" or
+// "acp") in the working folder: no `#!` line, which Windows can't use.
+const cli = process.execPath;
+const FAKE = `const mode = require("path").basename(process.argv[1]);
+if (mode === "whoami") { console.log(JSON.stringify({ email: "test@example.com" })); process.exit(0); }
+if (mode !== "acp") process.exit(2);
 const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...m }) + "\\n");
 const update = (u) => send({ method: "session/update", params: { sessionId: "s1", update: u } });
 let waiting;
@@ -99,10 +91,15 @@ process.stdin.on("data", (c) => {
     }
   }
 });
-`
-);
-chmodSync(cli, 0o755);
-test.after(() => rmSync(dir, { recursive: true, force: true }));
+`;
+writeFileSync(join(dir, "acp"), FAKE);
+writeFileSync(join(dir, "whoami"), FAKE);
+process.chdir(dir); // for the commands that run without a folder of their own (whoami)
+const startDir = process.cwd();
+test.after(async () => {
+  process.chdir(startDir); // Windows won't delete the folder a process is in
+  await removeTempDir(dir);
+});
 
 writeFileSync(join(dir, "n.txt"), "remember the milk");
 

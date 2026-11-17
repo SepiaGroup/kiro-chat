@@ -32,13 +32,26 @@ test("bare file name in the working folder counts", () => {
   assert.deepEqual(findImagePaths("look at logo.png please", "/w"), [path.resolve("/w", "logo.png")]);
 });
 
-// Needs Windows' own path rules, so it runs only there (CI has a Windows job).
-test("on Windows a typed or dragged C:\\ path keeps its backslashes", { skip: !WIN }, () => {
-  assert.deepEqual(findImagePaths('see C:\\Users\\me\\a.png and "C:\\My Pics\\b.JPG" and ~\\c.gif', "C:\\w"), [
+// The Windows rules, run on any machine through the platform argument.
+test("Windows: a typed or dragged C:\\ path keeps its backslashes", () => {
+  const text = 'see C:\\Users\\me\\a.png and "C:\\My Pics\\b.JPG" and ~\\c.gif and .\\sub\\d.webp and file:///C:/tmp/e.jpeg';
+  assert.deepEqual(findImagePaths(text, "C:\\w", "win32", "C:\\Users\\me"), [
     "C:\\Users\\me\\a.png",
     "C:\\My Pics\\b.JPG",
-    path.join(os.homedir(), "c.gif"),
+    "C:\\Users\\me\\c.gif",
+    "C:\\w\\sub\\d.webp",
+    "C:\\tmp\\e.jpeg",
   ]);
+});
+
+test("Windows: an apostrophe inside a file name stays in it", () => {
+  assert.deepEqual(findImagePaths("look at C:\\pics\\it's.png now", "C:\\w", "win32", "C:\\Users\\me"), ["C:\\pics\\it's.png"]);
+});
+
+test("macOS: ~\\ is not the home folder, ~/ is", () => {
+  assert.deepEqual(findImagePaths("~/a.png", "/w", "darwin", "/Users/me"), ["/Users/me/a.png"]);
+  // A file literally called ~\c.gif in the working folder.
+  assert.deepEqual(findImagePaths("see ~\\\\c.gif", "/w", "darwin", "/Users/me"), ["/w/~\\c.gif"]);
 });
 
 test("sniffImageMime checks the file's first bytes", () => {

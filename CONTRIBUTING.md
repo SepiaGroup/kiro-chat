@@ -29,7 +29,7 @@ manual checklist in [TEST.md](TEST.md) on a Mac without AVX, and its Windows
 section on a Windows 11 machine.
 
 Keep code that depends on the platform in a pure function that takes the
-platform as a parameter (see `candidateCliPaths`, `shellCommandLine`,
+platform as a parameter (see `candidateCliPaths`, `terminalLaunch`,
 `normalizePath` in `sessionList.ts`), so the Windows case can be tested on any
 machine.
 

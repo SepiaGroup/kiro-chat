@@ -16,6 +16,15 @@ test("on Windows the same folder compares equal however it is written", () => {
   assert.notEqual(normalizePath("C:\\Users\\me\\app2", "win32"), a);
 });
 
+test("on Windows a path that is not a drive or UNC path is left as the engine wrote it", () => {
+  // The engine in WSL or on another machine writes POSIX paths; they are not C:\\home\\x, and case counts there.
+  assert.equal(normalizePath("/home/Me/app/", "win32"), "/home/Me/app");
+  assert.notEqual(normalizePath("/home/Me/app", "win32"), normalizePath("/home/me/app", "win32"));
+  assert.equal(normalizePath("\\\\Server\\Share\\App\\", "win32"), "//server/share/app");
+  // Nothing is resolved against this process's own folder.
+  assert.equal(normalizePath("app/sub", "win32"), "app/sub");
+});
+
 test("normalizePath drops trailing slashes and /private", { skip: process.platform === "win32" }, () => {
   assert.equal(normalizePath("/private/tmp/x/"), "/tmp/x");
   assert.equal(normalizePath("/"), "/");

@@ -20,6 +20,10 @@ test("on Windows a backslash is a path separator and stays", () => {
   assert.equal(unescapeWord("C:\\a\\b", "win32"), "C:\\a\\b");
 });
 
+test("on Windows an apostrophe inside a word stays, and one that starts a word opens a quote", () => {
+  assert.deepEqual(tokenize("add C:\\pics\\it's.png 'a b.png' don't", "win32"), ["add", "C:\\pics\\it's.png", "a b.png", "don't"]);
+});
+
 test("with oneLine a quote closes on its own line, so an apostrophe in prose does not pair up", () => {
   const text = "it's here\nand isn't there\n'a b.png'";
   const quoted = (re: RegExp): string[] => {

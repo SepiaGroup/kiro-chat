@@ -5,13 +5,14 @@
 // <style> (by nonce) and no scripts except the one below.
 
 import { randomBytes } from "crypto";
+import { machine } from "../machine";
 
 export interface PairingCardOptions {
   /** The pairing link. */
   link: string;
-  /** The QR code as SVG (made from `link`); left out when the link only works on this computer. */
+  /** The QR code as SVG (made from `link`); left out when the link only works on this Mac. */
   qrSvg?: string;
-  /** Why the link only works on this computer, and what to do. Set when there is no tailnet address. */
+  /** Why the link only works on this Mac, and what to do. Set when there is no tailnet address. */
   problem?: { advice: string; canOpenSetup: boolean };
   /** When the link stops working, as the user's clock shows it. */
   expiresAt: string;
@@ -30,7 +31,7 @@ export function pairingCardHtml(o: PairingCardOptions): string {
   const nonce = o.nonce ?? randomBytes(18).toString("base64url");
   const csp = `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'`;
   const intro = o.problem
-    ? `<p class="warn" role="status">Remote access is on for this computer only. ${esc(o.problem.advice)}</p>`
+    ? `<p class="warn" role="status">Remote access is on for this ${machine()} only. ${esc(o.problem.advice)}</p>`
     : `<p>Point your phone's camera at the code, or send yourself the link. Your phone needs Tailscale on.</p>`;
   const qr = o.qrSvg ? `<div class="qr">${o.qrSvg}</div>` : "";
   const setup = o.problem?.canOpenSetup ? `<button data-action="setup">Open Tailscale Setup</button>` : "";

@@ -9,7 +9,8 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { AcpClient } from "../acpClient";
 import { errorMessage } from "../format";
-import { shellCommandLine } from "../shellCommand";
+import { homeRest } from "../homePath";
+import { terminalLaunch } from "../shellCommand";
 import { AvailableCommand, ConfigOption, PromptImage } from "../types";
 import { fitAnsi, sanitize, style, truncate } from "./ansi";
 import { tokenize } from "./slashCommands";
@@ -726,18 +727,23 @@ export class TerminalCommands {
 
   private runKiroCliInShell(args: string[], name: string): void {
     const cli = this.host.cliPath() ?? "kiro-cli";
+    const launch = terminalLaunch(cli, args, vscode.env.shell);
     const t = vscode.window.createTerminal({
       name,
       cwd: this.host.cwd(),
       // kiro-cli opens $EDITOR for agent configs; use VS Code and wait for the tab.
       env: { EDITOR: "code --wait", VISUAL: "code --wait" },
+      ...("sendText" in launch ? {} : { shellPath: launch.shellPath, shellArgs: launch.shellArgs }),
     });
     t.show();
-    t.sendText(shellCommandLine(cli, args, vscode.env.shell));
+    if ("sendText" in launch) {
+      t.sendText(launch.sendText);
+    }
   }
 
   private absPath(p: string): string {
-    const expanded = /^~[\\/]/.test(p) ? path.join(os.homedir(), p.slice(2)) : p;
+    const rest = homeRest(p);
+    const expanded = rest !== undefined ? path.join(os.homedir(), rest) : p;
     return path.isAbsolute(expanded) ? expanded : path.resolve(this.host.cwd(), expanded);
   }
 

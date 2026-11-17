@@ -5,6 +5,7 @@
 import { readFileSync, statSync } from "fs";
 import { homedir } from "os";
 import { resolve } from "path";
+import { homeRest } from "./homePath";
 
 /** Largest file attached, and the most attached in one prompt. */
 export const MAX_MENTION_BYTES = 256 * 1024;
@@ -53,8 +54,10 @@ export function expandFileMentions(prompt: string, cwd: string, io: FileIo = rea
   const attached: string[] = [];
   const skipped: Mentions["skipped"] = [];
   let total = 0;
-  const locate = (typed: string): string =>
-    /^~[\\/]/.test(typed) ? resolve(homedir(), typed.slice(2)) : resolve(cwd, typed); // resolve keeps an absolute path
+  const locate = (typed: string): string => {
+    const rest = homeRest(typed);
+    return rest !== undefined ? resolve(homedir(), rest) : resolve(cwd, typed); // resolve keeps an absolute path
+  };
   const text = prompt.replace(/@file:(\S+)/g, (whole, token: string) => {
     // "@file:a.ts," or "@file:a.ts?" in a sentence: the punctuation isn't part of the name.
     const trimmed = token.replace(/[.,;:!?)\]}>"']+$/, "");

@@ -8,13 +8,19 @@ import type { SessionSummary } from "./types";
  * Normalize a folder path for comparison: resolve it, strip trailing slashes
  * and drop macOS's `/private` prefix (`/private/tmp` is `/tmp`). On Windows
  * the engine and VS Code may write the same folder as `C:\Users\me\app`,
- * `c:/Users/me/app` or `C:\users\Me\App`, so there the slashes and the case
- * are made the same.
+ * `c:/Users/me/app` or `C:\users\Me\App`, so a drive or UNC path gets the same
+ * slashes and case. Any other path there (the engine in WSL or on another
+ * machine writes `/home/me`) is only stripped of trailing slashes.
  */
 export function normalizePath(p: string | undefined, platform: NodeJS.Platform = process.platform): string {
   if (platform === "win32") {
-    const w = path.win32.resolve(String(p ?? "")).replace(/\\/g, "/").replace(/\/+$/, "");
-    return (/^[A-Za-z]:$/.test(w) ? w + "/" : w).toLowerCase();
+    const raw = String(p ?? "");
+    if (/^[A-Za-z]:([\\/]|$)/.test(raw) || /^[\\/]{2}[^\\/]/.test(raw)) {
+      const w = path.win32.normalize(raw).replace(/\\/g, "/").replace(/\/+$/, "");
+      return (/^[A-Za-z]:$/.test(w) ? w + "/" : w).toLowerCase();
+    }
+    // Not a Windows path: the engine runs in WSL or on another machine. Case matters there.
+    return raw.replace(/\/+$/, "") || "/";
   }
   let s = path.resolve(String(p ?? "")).replace(/\/+$/, "") || "/";
   if (s.startsWith("/private/")) {

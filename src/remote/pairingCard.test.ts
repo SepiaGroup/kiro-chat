@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cardAction, pairingCardHtml } from "./pairingCard";
 import { encodeQr, qrSvg } from "./qr";
+import { machine } from "../machine";
 
 const link = "https://mac.tail1.ts.net:8443/#k=abc_DEF-123";
 
@@ -18,7 +19,7 @@ test("with a tailnet link the card shows the QR code, the link and the buttons",
 
 test("without Tailscale it says why, offers setup and retry, and shows no QR code", () => {
   const html = pairingCardHtml({ link: "http://127.0.0.1:5/#k=x", problem: { advice: "Tailscale is turned off.", canOpenSetup: true }, expiresAt: "1:00 PM" });
-  assert.match(html, /this computer only. Tailscale is turned off\./);
+  assert.match(html, new RegExp(`this ${machine()} only. Tailscale is turned off\\.`));
   assert.ok(html.includes('data-action="setup"') && html.includes('data-action="retry"'));
   assert.doesNotMatch(html, /<svg /);
   assert.ok(!pairingCardHtml({ link: "x", problem: { advice: "a", canOpenSetup: false }, expiresAt: "t" }).includes('data-action="setup"'));

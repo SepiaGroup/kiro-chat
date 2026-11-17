@@ -5,10 +5,11 @@
 // and its arguments.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { AcpClient } from "./acpClient";
+import { removeTempDir } from "./testTemp";
 
 const ENGINE = `
 const fs = require("fs");
@@ -61,13 +62,5 @@ test("a program is started with the engine's arguments, speaks CRLF lines, and i
     await new Promise((r) => setTimeout(r, 20));
   }
   assert.equal(pid > 0 && alive(pid), false, "the engine process was stopped");
-  // Windows keeps the folder busy for a moment after its process has gone. Cleaning up is not what is tested.
-  for (let i = 0; i < 20; i++) {
-    try {
-      rmSync(dir, { recursive: true, force: true });
-      break;
-    } catch {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-  }
+  await removeTempDir(dir);
 });

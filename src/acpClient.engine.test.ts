@@ -1,33 +1,29 @@
 // AcpClient against a fake engine process speaking JSON-RPC over stdio.
-import { test as nodeTest } from "node:test";
-
-// The fake engine is a script that starts through its #! line, which Windows
-// can't do. The transport on Windows is covered by acpClient.spawn.test.ts.
-const test = Object.assign(
-  (name: string, fn: () => void | Promise<void>) =>
-    nodeTest(name, { skip: process.platform === "win32" ? "the fake engine needs a #! line" : false }, fn),
-  { after: nodeTest.after }
-);
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { AcpClient } from "./acpClient";
+import { removeTempDir } from "./testTemp";
 import type { ChatEvent } from "./types";
 
 const dir = mkdtempSync(join(tmpdir(), "kiro-fake-"));
-test.after(() => rmSync(dir, { recursive: true, force: true }));
+test.after(() => removeTempDir(dir));
 
 /**
- * Write an executable fake `kiro-cli`. `onRequest(msg, send)` runs in the fake
- * for each request from the client; it's given as source text.
+ * Write a fake engine and return its folder, which is also the folder the client
+ * works in. The program is node itself and the engine is the file `acp` there
+ * (node runs the file named by the first argument), so it starts the same way on
+ * Windows, where a `#!` script can't. `onRequest(msg, send)` runs in the fake for
+ * each request from the client; it's given as source text.
  */
 function fakeEngine(name: string, onRequest: string): string {
-  const file = join(dir, name);
+  const folder = join(dir, name);
+  mkdirSync(folder);
   writeFileSync(
-    file,
-    `#!/usr/bin/env node
-const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...m }) + "\\n");
+    join(folder, "acp"),
+    `const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...m }) + "\\n");
 const answers = new Map();
 let buf = "";
 process.stdin.on("data", (c) => {
@@ -43,8 +39,7 @@ process.stdin.on("data", (c) => {
 });
 `
   );
-  chmodSync(file, 0o755);
-  return file;
+  return folder;
 }
 
 const BASIC = `(msg, send, ask) => {
@@ -64,11 +59,12 @@ async function eventually(what: string, cond: () => boolean, ms = 3000): Promise
 }
 
 function client(
-  cliPath: string,
+  folder: string,
   timeoutsMs?: Record<string, number>,
-  extra: { initialResponseTimeoutMs?: number; editorContext?: () => { active?: string; open: string[] } } = {}
+  extra: { initialResponseTimeoutMs?: number; editorContext?: () => { active?: string; open: string[] } } = {},
+  cliPath: string = process.execPath
 ): { c: AcpClient; events: ChatEvent[]; logs: string[] } {
-  const c = new AcpClient({ cliPath, engine: "v3", cwd: dir, timeoutsMs, ...extra });
+  const c = new AcpClient({ cliPath, engine: "v3", cwd: folder, timeoutsMs, ...extra });
   const events: ChatEvent[] = [];
   const logs: string[] = [];
   c.on("event", (e: ChatEvent) => events.push(e));
@@ -154,7 +150,7 @@ test("an engine dying mid-turn rejects the prompt, ends the turn and doesn't cra
 });
 
 test("a missing binary fails start with a clear error", async () => {
-  const { c } = client(join(dir, "does-not-exist"));
+  const { c } = client(dir, undefined, {}, join(dir, "does-not-exist"));
   await assert.rejects(c.start(), /Couldn't start .*ENOENT/);
   c.dispose();
 });
@@ -234,7 +230,6 @@ test("cancelling skips the waiting question; a question without text is skipped 
 });
 
 test("@file: puts the file in the prompt and keeps what was typed as the display text", async () => {
-  writeFileSync(join(dir, "note.txt"), "remember the milk");
   const cli = fakeEngine(
     "mention",
     `(msg, send, ask) => {
@@ -245,6 +240,7 @@ test("@file: puts the file in the prompt and keeps what was typed as the display
       }
     }`
   );
+  writeFileSync(join(cli, "note.txt"), "remember the milk");
   const { c, events, logs } = client(cli);
   try {
     await c.start();
@@ -319,7 +315,7 @@ test("open editor files go in as a context item, only when they changed", async 
       }
     }`
   );
-  let ctx: { active?: string; open: string[] } = { active: dir + "/a.ts", open: [dir + "/a.ts", dir + "/b.md"] };
+  let ctx: { active?: string; open: string[] } = { active: cli + "/a.ts", open: [cli + "/a.ts", cli + "/b.md"] };
   const { c, events } = client(cli, undefined, { editorContext: () => ctx });
   const sent = (): unknown[] => JSON.parse(chunks(events).at(-1) ?? "null");
   const notices = (): string[] => events.flatMap((e) => (e.kind === "notice" ? [e.text] : []));
@@ -339,7 +335,7 @@ test("open editor files go in as a context item, only when they changed", async 
     assert.deepEqual(notices(), ["Sent editor context: active a.ts, 2 open files."]);
     await c.prompt("two"); // unchanged: not sent again
     assert.deepEqual(sent(), []);
-    ctx = { open: [dir + "/b.md"] };
+    ctx = { open: [cli + "/b.md"] };
     await c.prompt("three");
     assert.equal((sent() as Array<{ resource: { text: string } }>)[0].resource.text.includes("Active file: none"), true);
     ctx = { open: [] }; // nothing open: nothing to say
@@ -439,7 +435,6 @@ test("taking back queued messages reports them as removed", async () => {
 });
 
 test("@file: works in a steering message", async () => {
-  writeFileSync(join(dir, "steer.txt"), "from the file");
   const cli = fakeEngine(
     "steer-file",
     `async (msg, send, ask) => {
@@ -452,6 +447,7 @@ test("@file: works in a steering message", async () => {
       if (msg.method === "session/prompt") globalThis.promptId = msg.id;
     }`
   );
+  writeFileSync(join(cli, "steer.txt"), "from the file");
   const { c, events } = client(cli);
   try {
     await c.start();
