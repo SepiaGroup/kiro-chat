@@ -26,13 +26,22 @@ export interface RunResult {
 
 export type Run = (cli: string, args: string[], timeoutMs: number) => Promise<RunResult>;
 
-/** Where the CLI may be. A GUI-launched VS Code often has no /usr/local/bin on its PATH. */
-export const CLI_CANDIDATES: readonly string[] = [
-  "tailscale",
-  "/usr/local/bin/tailscale",
-  "/opt/homebrew/bin/tailscale",
-  "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-];
+/**
+ * Where the CLI may be. A GUI-launched VS Code often has no /usr/local/bin on its PATH.
+ * On Windows the installer puts `tailscale.exe` in Program Files (and on PATH).
+ */
+export function cliCandidates(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): string[] {
+  if (platform === "win32") {
+    return ["tailscale", `${env.ProgramFiles || "C:\\Program Files"}\\Tailscale\\tailscale.exe`];
+  }
+  return [
+    "tailscale",
+    "/usr/local/bin/tailscale",
+    "/opt/homebrew/bin/tailscale",
+    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+  ];
+}
+export const CLI_CANDIDATES: readonly string[] = cliCandidates();
 
 /** HTTPS ports `tailscale serve` accepts. 8443 leaves 443 to whatever the user serves already. */
 export const HTTPS_PORTS: readonly number[] = [443, 8443, 10000];
@@ -196,7 +205,7 @@ export class TailscaleServe {
       return {
         ok: false,
         advice:
-          "Tailscale is not installed on this Mac (no tailscale command found). Install it from tailscale.com/download, log in, then start remote access again.",
+          "Tailscale is not installed on this computer (no tailscale command found). Install it from tailscale.com/download, log in, then start remote access again.",
       };
     }
     const cli = this.cli;

@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { homedir } from "os";
 import { join } from "path";
 import { expandFileMentions, FileIo, MAX_MENTION_BYTES, mentionNotice } from "./fileMentions";
 
@@ -21,6 +22,12 @@ test("absolute paths work; text without mentions is untouched", () => {
   assert.equal(expandFileMentions("hi @file", "/w", io({})).text, "hi @file");
   const m = expandFileMentions("@file:/x/n.txt", "/w", io({ "/x/n.txt": "n" }));
   assert.equal(m.text, '<attached_file path="/x/n.txt"> n </attached_file>');
+});
+
+test("~/ and ~\\ both mean the home folder", () => {
+  const files = { [join(homedir(), "n.txt")]: "n" };
+  assert.deepEqual(expandFileMentions("@file:~/n.txt", "/w", io(files)).attached, ["~/n.txt"]);
+  assert.deepEqual(expandFileMentions("@file:~\\n.txt", "/w", io(files)).attached, ["~\\n.txt"]);
 });
 
 test("a mention that can't be attached stays as typed, with a reason", () => {

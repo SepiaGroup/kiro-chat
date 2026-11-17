@@ -2,7 +2,7 @@
 // remote access on publishes a small file (its loopback port and name) in one
 // folder, and one window at a time holds the "hub" lock: it owns the tailnet
 // address and shows every window's chats to the phone. A window that closes or
-// crashes is noticed by its process id (and the Mac's boot time, as process ids
+// crashes is noticed by its process id (and the computer's boot time, as process ids
 // are reused after a restart). Plain files, polled: nothing here has to
 // survive a crash. Files are written in full, then linked or renamed into
 // place, so nobody reads one half written. Uses the file system only (no
@@ -18,7 +18,7 @@ const TEMP_MAX_AGE_MS = 60_000;
 /** Boot times further apart than this are different restarts (allows for clock changes). */
 const BOOT_SLACK_S = 120;
 
-/** When this Mac started, in seconds. */
+/** When this computer started, in seconds. */
 function bootTime(): number {
   return Math.round(Date.now() / 1000 - os.uptime());
 }
@@ -165,7 +165,7 @@ export class WindowRegistry {
     }
   }
 
-  /** The process wrote this file since this Mac last started, and still runs. */
+  /** The process wrote this file since this computer last started, and still runs. */
   private live(pid: number, boot: number | undefined): boolean {
     return (boot === undefined || Math.abs(boot - this.boot) <= BOOT_SLACK_S) && this.alive(pid);
   }

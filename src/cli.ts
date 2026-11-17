@@ -4,16 +4,45 @@
 import { spawn, spawnSync } from "child_process";
 import { accessSync, constants, existsSync, statSync } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { delimiter, join, win32 } from "path";
 
-/** Candidate locations checked when no explicit path is configured. */
-export function candidateCliPaths(): string[] {
-  const home = homedir();
-  return [
-    join(home, ".local", "bin", "kiro-cli"),
-    "/usr/local/bin/kiro-cli",
-    "/opt/homebrew/bin/kiro-cli",
-  ];
+/**
+ * Candidate locations checked when no explicit path is configured. On Windows
+ * the installer (`install.ps1`) puts `kiro-cli.exe` in `%LOCALAPPDATA%\Kiro-Cli`
+ * (seen in reports; not checked on a Windows machine by this project).
+ */
+export function candidateCliPaths(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = homedir()
+): string[] {
+  if (platform === "win32") {
+    const local = env.LOCALAPPDATA || win32.join(home, "AppData", "Local");
+    return [win32.join(local, "Kiro-Cli", "kiro-cli.exe"), win32.join(home, ".local", "bin", "kiro-cli.exe")];
+  }
+  return [join(home, ".local", "bin", "kiro-cli"), "/usr/local/bin/kiro-cli", "/opt/homebrew/bin/kiro-cli"];
+}
+
+/**
+ * The program from the output of `where kiro-cli` (one path per line). Prefers a
+ * `.exe`: a `.cmd` or `.bat` can't be started without a shell.
+ */
+export function pickFromWhere(stdout: string): string | undefined {
+  const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  return lines.find((l) => /\.exe$/i.test(l)) ?? lines[0];
+}
+
+/** Where kiro-cli is on PATH, or undefined. A login shell on macOS and Linux, `where` on Windows. */
+function findOnPath(platform: NodeJS.Platform = process.platform): string | undefined {
+  if (platform === "win32") {
+    // The full path, so a PATH that VS Code was started with can't hide where.exe.
+    const where = win32.join(process.env.SystemRoot || "C:\\Windows", "System32", "where.exe");
+    const r = spawnSync(where, ["kiro-cli"], { encoding: "utf8", windowsHide: true });
+    return r.status === 0 ? pickFromWhere(r.stdout) : undefined;
+  }
+  const r = spawnSync("bash", ["-lc", "command -v kiro-cli"], { encoding: "utf8" });
+  const p = r.status === 0 ? r.stdout.trim() : "";
+  return p.length > 0 ? p : undefined;
 }
 
 /**
@@ -30,15 +59,9 @@ export function resolveCliPath(configured?: string): string | undefined {
     }
     return p;
   }
-  // Try PATH via `command -v`.
-  const onPath = spawnSync("bash", ["-lc", "command -v kiro-cli"], {
-    encoding: "utf8",
-  });
-  if (onPath.status === 0) {
-    const p = onPath.stdout.trim();
-    if (p.length > 0) {
-      return p;
-    }
+  const onPath = findOnPath();
+  if (onPath) {
+    return onPath;
   }
   for (const c of candidateCliPaths()) {
     if (existsSync(c)) {
@@ -49,7 +72,10 @@ export function resolveCliPath(configured?: string): string | undefined {
 }
 
 /** Why `p` can't be run, or undefined if it can. */
-export function executableProblem(p: string): string | undefined {
+export function executableProblem(p: string, platform: NodeJS.Platform = process.platform): string | undefined {
+  if (platform === "win32" && /\.(cmd|bat)$/i.test(p)) {
+    return "is a script; use the kiro-cli.exe it starts";
+  }
   try {
     if (!statSync(p).isFile()) {
       return "isn't a file";
@@ -120,15 +146,16 @@ export function runCli(
 
 /**
  * Build an environment that excludes the AVX-dependent bundled Bun inside the
- * Kiro app bundles from PATH, so nothing AVX-only is ever invoked.
+ * Kiro app bundles from PATH, so nothing AVX-only is ever invoked. A copy of
+ * `process.env` is a plain object, and on Windows its variable is named `Path`,
+ * so the PATH key is found without regard to case and keeps its own name.
  */
-export function sanitizedEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function sanitizedEnv(base: NodeJS.ProcessEnv = process.env, sep: string = delimiter): NodeJS.ProcessEnv {
   const env = { ...base };
-  const path = env.PATH ?? "";
-  const filtered = path
-    .split(":")
+  const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  env[key] = (env[key] ?? "")
+    .split(sep)
     .filter((seg) => !/Kiro( CLI)?\.app\/Contents/i.test(seg))
-    .join(":");
-  env.PATH = filtered;
+    .join(sep);
   return env;
 }

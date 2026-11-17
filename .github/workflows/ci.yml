@@ -26,3 +26,18 @@ jobs:
         with:
           name: vsix
           path: "*.vsix"
+
+  # Windows support is best effort: this proves the code compiles and the tests
+  # pass there, not that the chat works with the real engine.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run compile
+      - run: npm run lint
+      - run: npm test

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { baseUrl, existingProxyPort, existingServe, findCli, interpretServe, parseStatus, RunResult, Run, serveArgs, TailscaleServe, unserveArgs } from "./tailscale";
+import { baseUrl, cliCandidates, existingProxyPort, existingServe, findCli, interpretServe, parseStatus, RunResult, Run, serveArgs, TailscaleServe, unserveArgs } from "./tailscale";
 
 const ok = (stdout = ""): RunResult => ({ code: 0, stdout, stderr: "", timedOut: false });
 const status = (state: string, extra: Record<string, unknown> = {}) =>
@@ -143,4 +143,10 @@ test("a proxy to another local port that still answers is not taken over; a dead
   // Our own port again (a restart on the same port) is just ours.
   const same = fake(handlers);
   assert.equal((await new TailscaleServe(same.run, undefined, async () => true).expose(40000)).ok, true);
+});
+
+test("on Windows the Tailscale CLI is tried on PATH, then in Program Files", () => {
+  assert.deepEqual(cliCandidates("win32", { ProgramFiles: "D:\\Programs" }), ["tailscale", "D:\\Programs\\Tailscale\\tailscale.exe"]);
+  assert.equal(cliCandidates("win32", {})[1], "C:\\Program Files\\Tailscale\\tailscale.exe");
+  assert.ok(cliCandidates("darwin").includes("/Applications/Tailscale.app/Contents/MacOS/Tailscale"));
 });

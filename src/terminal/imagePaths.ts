@@ -68,7 +68,7 @@ export function findImagePaths(text: string, cwd: string): string[] {
       } catch {
         continue;
       }
-    } else if (p === "~" || p.startsWith("~/")) {
+    } else if (p === "~" || /^~[\\/]/.test(p)) {
       p = path.join(os.homedir(), p.slice(1));
     } else if (!path.isAbsolute(p)) {
       // Only treat it as a relative path if it looks like one.

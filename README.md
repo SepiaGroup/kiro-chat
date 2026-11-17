@@ -18,8 +18,11 @@ slash commands use v3-only ACP methods.
 
 ## Requirements
 
-- macOS. Built and tested on an Intel Mac without AVX; other platforms aren't
-  supported (the extension uses `bash`, macOS paths and macOS PATH handling).
+- macOS, or Windows 11 (PowerShell). Built and tested on an Intel Mac without
+  AVX. **Windows support is new and untested on a real Windows machine**: the
+  automated tests run on Windows in CI, but nobody has used the chat there yet.
+  If something fails on Windows, please open an issue with the Output → Kiro
+  Chat log. Linux isn't supported.
 - `kiro-cli` with the v3 engine, installed and on PATH (or set
   `kiroChat.kiroCliPath`). Tested with kiro-cli 2.35.2.
 - Logged in (`kiro-cli login`). The chat checks at startup and offers a login
@@ -265,7 +268,7 @@ messages are no longer part of it.
 | Setting | Default | Description |
 | --- | --- | --- |
 | `kiroChat.openIn` | `editor` | Where Open Chat goes: `editor` (tab) or `panel`. |
-| `kiroChat.kiroCliPath` | _(empty)_ | Path to `kiro-cli`. Empty = PATH, then `~/.local/bin/kiro-cli`. User settings only (a workspace can't set it). |
+| `kiroChat.kiroCliPath` | _(empty)_ | Path to `kiro-cli`. Empty = PATH, then `~/.local/bin/kiro-cli` (on Windows `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`). Must be the program, not a `.cmd` script. User settings only (a workspace can't set it). |
 | `kiroChat.defaultModel` | `auto` | Model for new sessions (see `kiro-cli chat --list-models`). |
 | `kiroChat.autopilot` | `false` | Off = Supervised (approve each change). On = tools run without asking. |
 | `kiroChat.enterToSend` | `true` | Enter sends, Shift+Enter adds a line. Off reverses them. |
@@ -285,7 +288,7 @@ own messages.
 
 - **"Could not find the kiro-cli binary"**: install kiro-cli, or set
   `kiroChat.kiroCliPath` (user settings) to its full path. `which kiro-cli`
-  in a terminal shows where it is.
+  in a terminal (`where kiro-cli` in PowerShell) shows where it is.
 - **"kiroChat.kiroCliPath is set to …, which doesn't exist"**: fix or clear
   the setting.
 - **Login card keeps coming back**: run `kiro-cli login` in a terminal, then

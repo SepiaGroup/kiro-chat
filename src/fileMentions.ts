@@ -54,7 +54,7 @@ export function expandFileMentions(prompt: string, cwd: string, io: FileIo = rea
   const skipped: Mentions["skipped"] = [];
   let total = 0;
   const locate = (typed: string): string =>
-    typed.startsWith("~/") ? resolve(homedir(), typed.slice(2)) : isAbsolute(typed) ? typed : resolve(cwd, typed);
+    /^~[\\/]/.test(typed) ? resolve(homedir(), typed.slice(2)) : isAbsolute(typed) ? typed : resolve(cwd, typed);
   const text = prompt.replace(/@file:(\S+)/g, (whole, token: string) => {
     // "@file:a.ts," or "@file:a.ts?" in a sentence: the punctuation isn't part of the name.
     const trimmed = token.replace(/[.,;:!?)\]}>"']+$/, "");

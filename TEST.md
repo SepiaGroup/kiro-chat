@@ -2,7 +2,8 @@
 
 Automated and manual checks for Kiro Chat. Run the automated checks on
 every change. Run the manual checks before a release, on the target machine
-(no AVX), with `kiro-cli` installed and logged in.
+(no AVX), with `kiro-cli` installed and logged in. The Windows section at the
+end is for a Windows 11 machine.
 
 ## Automated
 
@@ -213,3 +214,18 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] Set `kiroChat.kiroCliPath` to a file that doesn't exist → the chat says the setting points to a missing file.
 - [ ] Start a long reply, then `pkill -f "kiro-cli-chat acp"` → the chat says the engine exited, leaves the busy state, and Restart works.
 - [ ] Esc during a reply → the terminal footer shows "■ Cancelled".
+
+## Windows 11 (PowerShell)
+
+Windows support is best effort and has not been used on a real machine yet. Report anything that fails with the Output → Kiro Chat log. Needs `kiro-cli` installed with `irm 'https://cli.kiro.dev/install.ps1' | iex` and logged in.
+
+- [ ] The extension finds `kiro-cli` without `kiroChat.kiroCliPath` (it uses `where`, then `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`). With `kiroChat.kiroCliPath` set to a `.cmd` file the chat says it must be the `.exe`.
+- [ ] **Open Chat** starts the engine and shows the model list. A prompt gets a reply. `kiro-cli acp --agent-engine v3` is the first thing to check here: if the engine doesn't start, the Output log has its last messages.
+- [ ] Logged out: the login button opens a terminal that runs `kiro-cli login` without a PowerShell error, also when the path has a space (`C:\Users\Jane Doe\…`). Try it in cmd and Git Bash as the default terminal as well.
+- [ ] Approvals: Allow, Deny, a rule and a folder rule work (file changes show as `C:/…` or `src/…`; typing a folder as `src\sub` is accepted).
+- [ ] Resume lists this folder's sessions (the folder is matched however the drive letter and slashes are written).
+- [ ] `@file:src\a.ts`, `@file:~\notes.md` and a dragged image file attach.
+- [ ] Terminal chat (**New Terminal Chat**): typing, `/` menu, Shift+Enter, Esc, an approval with `y`, `/restart`. `/paste` says images can't be pasted here.
+- [ ] Remote access with Tailscale for Windows installed: the pairing card has a QR code and the phone opens the chat. Without Tailscale it says to install it.
+- [ ] Closing a chat leaves no `kiro-cli.exe` running (Task Manager).
+- [ ] The status bar tooltip says Ctrl+Alt+K and the shortcut opens the chat.

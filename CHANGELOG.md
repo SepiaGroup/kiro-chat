@@ -4,6 +4,7 @@
 
 First release.
 
+- Windows 11 support, best effort: kiro-cli is found with `where` and in `%LOCALAPPDATA%\Kiro-Cli`, the login terminal works in PowerShell, cmd and Git Bash, the Resume list matches folders whatever the drive letter case and slashes, `~\` is the home folder, and the Tailscale CLI is found in Program Files. The tests run on Windows in CI. Nobody has used the chat on a real Windows machine yet. User-facing text says "this computer" instead of "this Mac".
 - `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
 - Security: a paired device is now trusted like you at the keyboard, in chat tabs and terminal chats (before: Allow once and Deny only). Anything that changes approvals or Autopilot needs the `approve` permission, also when typed as a command. Take `approve` out of `kiroChat.remote.permissions` to stop a device answering approvals; there is no "once only" level.
 - Remote devices can do what you can at the keyboard in a chat tab: all the approval choices (rules included), Autopilot and the other settings, Restart, Resume, new tabs and the `/` commands, with their output on the phone. What acts on the Mac itself (login, `/remote`, `/copy`, `/settings`, `/theme`, `/transcript`, `/chat save`, `/agent create|edit`, `/context add`, `/knowledge add|update`) is refused, and `/set` is limited to the Settings panel's options. In terminal chats on the phone, commands and settings stay as they were.

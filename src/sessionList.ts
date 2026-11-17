@@ -6,9 +6,16 @@ import type { SessionSummary } from "./types";
 
 /**
  * Normalize a folder path for comparison: resolve it, strip trailing slashes
- * and drop macOS's `/private` prefix (`/private/tmp` is `/tmp`).
+ * and drop macOS's `/private` prefix (`/private/tmp` is `/tmp`). On Windows
+ * the engine and VS Code may write the same folder as `C:\Users\me\app`,
+ * `c:/Users/me/app` or `C:\users\Me\App`, so there the slashes and the case
+ * are made the same.
  */
-export function normalizePath(p: string | undefined): string {
+export function normalizePath(p: string | undefined, platform: NodeJS.Platform = process.platform): string {
+  if (platform === "win32") {
+    const w = path.win32.resolve(String(p ?? "")).replace(/\\/g, "/").replace(/\/+$/, "");
+    return (/^[A-Za-z]:$/.test(w) ? w + "/" : w).toLowerCase();
+  }
   let s = path.resolve(String(p ?? "")).replace(/\/+$/, "") || "/";
   if (s.startsWith("/private/")) {
     s = s.slice("/private".length);
