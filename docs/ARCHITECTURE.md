@@ -455,18 +455,23 @@ Windows 11 support is best effort. Kiro CLI 2.0 added a native Windows build
 the Kiro docs; not checked on a machine by this project). What differs from macOS, each
 a pure function that takes the platform so it is tested everywhere:
 
-- Finding the program: `where.exe kiro-cli` (full path under `%SystemRoot%`,
-  prefers `.exe`), then `candidateCliPaths`. A `.cmd` or `.bat` is refused,
-  because spawning one without a shell fails.
-- `sanitizedEnv` finds the PATH variable whatever its case (`Path` on Windows;
-  a copy of `process.env` is a plain, case-sensitive object) and splits on
-  `path.delimiter`.
-- A terminal opened to run `kiro-cli login` or an agent command gets a line in
-  the quoting of the user's shell (`shellCommandLine`): PowerShell needs `&` before
-  a quoted program, cmd wants double quotes, Git Bash single quotes.
+- Finding the program: `where.exe kiro-cli` (full path under `%SystemRoot%`, 5 s
+  limit; the login-shell lookup on macOS has 10 s) and only an `.exe` counts, then
+  `candidateCliPaths`. A `.cmd` or `.bat` is refused, because spawning one without a
+  shell fails.
+- `sanitizedEnv(env, platform)` finds the PATH variable whatever its case (`Path` on
+  Windows; a copy of `process.env` is a plain, case-sensitive object) and splits on
+  that platform's separator.
+- A terminal opened to run `kiro-cli login` or an agent command (`terminalLaunch`)
+  gets a line in the quoting of the user's shell: PowerShell needs `&` before a
+  quoted program (and a comma, `@` or `%` forces quotes, curly quotes are doubled),
+  cmd wants double quotes, Git Bash single quotes. For a shell whose quoting is not
+  known (WSL, `System32\bash.exe`, fish, nu), or a value cmd can't quote (a `%`), the
+  terminal runs the program itself (`shellPath`, `shellArgs`) and nothing is quoted.
 - `normalizePath` in `sessionList.ts` makes `C:\a\B`, `c:/a/b` and `C:/a/b/` the
-  same folder, so Resume finds sessions. Approval rules already handled drive
-  letters and backslashes (`approvalRules.ts`).
+  same folder, so Resume finds sessions. Only drive and UNC paths get that; a POSIX
+  path from an engine in WSL is kept as written. Approval rules already handled
+  drive letters and backslashes (`approvalRules.ts`).
 - Stopping an engine: `child.kill("SIGTERM")` ends the process at once on
   Windows (there are no signals), which is what we want.
 - The Tailscale CLI is also looked for in `%ProgramFiles%\Tailscale`.
@@ -475,18 +480,24 @@ a pure function that takes the platform so it is tested everywhere:
 Not verified: that `kiro-cli acp --agent-engine v3 --auth-method cli` and the
 engine's methods behave on Windows as on macOS, how the engine writes folder
 paths in `session/list`, and the terminal chat's keys in Windows Terminal. CI
-runs the compile, lint and the tests on `windows-latest` (324 pass, 24 are
-skipped there). That proves nothing about the real engine. The skipped tests:
-the fake-engine tests in `acpClient.engine.test.ts` and `terminalChat.test.ts`
-(the fake is a `#!` script, which Windows can't start), and three that check
-POSIX facts (the execute bit, file mode bits, macOS's `/private`). In their
-place `acpClient.spawn.test.ts` runs on every platform: it starts node as the
-program, with the fake engine as a file named `acp` in the working folder, and
-checks the arguments, CRLF lines, the PATH and that `dispose()` ends the process.
+runs the compile, lint and the tests on `windows-latest` (361 pass, 3 are
+skipped there). That proves nothing about the real engine. The fake-engine tests
+(`acpClient.engine.test.ts`, `terminalChat.test.ts`, `acpClient.spawn.test.ts`)
+run everywhere: the program is node itself and the fake engine is a file named
+`acp` (or `whoami`) in the working folder, so no `#!` line is needed. They check
+the arguments, CRLF lines, the PATH and that `dispose()` ends the process. The
+three skipped tests check POSIX facts (the execute bit, file mode bits, macOS's
+`/private`). A temp folder can stay busy for a moment on Windows after its
+process exits, so tests delete it with `removeTempDir` (`testTemp.ts`).
 
 A backslash is a path separator on Windows, so `tokenize` and `findImagePaths`
-(`terminal/words.ts`) don't treat it as an escape there; a path with spaces
-goes in quotes.
+(`terminal/words.ts`) don't treat it as an escape there. A path with spaces goes
+in quotes; an unquoted one is split at the space, and an image path that is split
+is just not found. An apostrophe inside a word (`it's.png`) stays in it.
+`~\` is the home folder on Windows only (`homePath.ts`). Text for the user says
+"Mac" on macOS and "computer" elsewhere (`machine.ts`). The status bar tooltip
+takes its shortcut from the extension's own `package.json` (`shortcut.ts`); VS
+Code can't tell an extension what the user rebound.
 
 ## Known limits
 
