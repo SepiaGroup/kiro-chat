@@ -1,7 +1,7 @@
 {
   "name": "kiro-chat",
   "displayName": "Kiro Chat",
-  "description": "Chat with the Kiro agent in VS Code: editor tabs, the panel or a terminal chat, with approvals and slash commands, and from your phone.",
+  "description": "Chat with the Kiro agent in editor tabs, the side bar or a terminal. Approvals, slash commands, session resume, and remote control from your phone over Tailscale. Runs on Macs without AVX.",
   "version": "0.1.0",
   "publisher": "SepiaGroup",
   "license": "MIT",
@@ -30,6 +30,7 @@
     }
   },
   "categories": [
+    "AI",
     "Chat",
     "Other"
   ],
@@ -38,7 +39,11 @@
     "kiro-cli",
     "chat",
     "agent",
-    "acp"
+    "acp",
+    "ai",
+    "slash commands",
+    "remote control",
+    "tailscale"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [

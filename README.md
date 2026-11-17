@@ -1,8 +1,24 @@
 # Kiro Chat
 
-A VS Code extension for chatting with the Kiro agent: in editor tabs, in the
-the side bar or in a terminal chat, with approvals, slash commands and remote
-access from your phone.
+Chat with the Kiro agent inside VS Code, and carry on from your phone.
+
+- **Several chats at once.** Editor tabs, a side bar view and terminal chats,
+  each with its own conversation. They reopen after a reload, and Resume brings
+  back earlier sessions.
+- **You stay in control.** In Supervised mode every file change and command
+  waits for your answer: allow, deny (with a reason) or create an allow or deny
+  rule. Autopilot is one switch away.
+- **Slash commands.** `/usage`, `/context`, `/model`, `/compact`, `/agent`,
+  `/mcp` and the rest of kiro-cli's commands work in chat tabs and terminal
+  chats. Type `/` for a picker.
+- **Remote control.** Turn on remote access, scan a QR code, and watch, prompt,
+  stop and approve your chats from a phone or any browser on your tailnet. It
+  goes over [Tailscale](https://tailscale.com), is off by default, and nothing
+  is hosted anywhere else.
+- **Runs on Macs without AVX.** kiro-cli's own terminal UI crashes there; this
+  extension doesn't use it. Windows 11 is supported on a best-effort basis.
+
+It needs the Kiro CLI (`kiro-cli`) installed and logged in. See Requirements.
 
 ## How it works
 
