@@ -71,6 +71,10 @@ slash commands use v3-only ACP methods.
 - Logged in (`kiro-cli login`). The chat checks at startup and offers a login
   button if you aren't.
 - VS Code 1.98 or later.
+- For remote access only: [Tailscale](https://tailscale.com), free for personal
+  use, installed and logged in on this computer and on the phone, in the same
+  tailnet, with HTTPS Certificates turned on. See
+  [Remote access](docs/guide/remote-access.md). The chat works without it.
 
 ## Privacy
 

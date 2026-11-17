@@ -8,7 +8,9 @@ so only your own devices can reach it, and nothing is hosted anywhere else.
 
 One-time setup:
 
-1. Install Tailscale on the Mac and the phone and log in to the same tailnet.
+1. Install [Tailscale](https://tailscale.com/download) on the Mac and the
+   phone (free for personal use) and log in to the same tailnet. Remote access
+   needs it; the rest of the extension doesn't.
 2. In the Tailscale admin console, turn on **HTTPS Certificates** (DNS page).
    The first time you start remote access, Tailscale may also give a link to
    switch on Serve; the extension shows it with an **Open Tailscale Setup**

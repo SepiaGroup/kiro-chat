@@ -61,4 +61,6 @@ in ⚙ Settings if you want tools to run without asking.
 
 - [Chat tabs](chat-tabs.md): everything in the chat tab and side bar chat.
 - [Terminal chat](terminal-chat.md): a text-only chat in the Terminal panel.
-- [Remote access](remote-access.md): use your chats from your phone.
+- [Remote access](remote-access.md): use your chats from your phone. This
+  needs [Tailscale](https://tailscale.com) on this computer and on the phone;
+  nothing else in the extension does.
