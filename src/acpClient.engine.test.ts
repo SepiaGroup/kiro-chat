@@ -1,14 +1,15 @@
 // AcpClient against a fake engine process speaking JSON-RPC over stdio.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { AcpClient } from "./acpClient";
+import { removeTempDir } from "./testTemp";
 import type { ChatEvent } from "./types";
 
 const dir = mkdtempSync(join(tmpdir(), "kiro-fake-"));
-test.after(() => rmSync(dir, { recursive: true, force: true }));
+test.after(() => removeTempDir(dir));
 
 /**
  * Write a fake engine and return its folder, which is also the folder the client

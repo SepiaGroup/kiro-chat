@@ -5,10 +5,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import Module from "node:module";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { stripAnsi } from "./ansi";
+import { removeTempDir } from "../testTemp";
 
 class Emitter<T> {
   private listeners: Array<(v: T) => void> = [];
@@ -95,9 +96,9 @@ writeFileSync(join(dir, "acp"), FAKE);
 writeFileSync(join(dir, "whoami"), FAKE);
 process.chdir(dir); // for the commands that run without a folder of their own (whoami)
 const startDir = process.cwd();
-test.after(() => {
+test.after(async () => {
   process.chdir(startDir); // Windows won't delete the folder a process is in
-  rmSync(dir, { recursive: true, force: true });
+  await removeTempDir(dir);
 });
 
 writeFileSync(join(dir, "n.txt"), "remember the milk");
