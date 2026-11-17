@@ -18,7 +18,10 @@ agent:
    install the `.vsix` and ask the user to run the TEST.md checklist.
 4. Open the PR. After the user merges it, tag the merge commit:
    `git tag v<version> && git push origin v<version>` (only when asked).
-5. Publishing needs the user's Marketplace token for the `SepiaGroup`
-   publisher. Don't publish yourself; give the user the command
-   (`npx vsce publish` from the tagged commit) or the `.vsix` to upload.
+5. Publishing goes to the VS Code Marketplace and to Open VSX, from the same
+   `.vsix` built at the tagged commit. It needs the user's tokens for the
+   `SepiaGroup` publisher and namespace. Don't publish yourself; give the user
+   the commands (`npx vsce publish --packagePath kiro-chat-<version>.vsix` and
+   `npx ovsx publish kiro-chat-<version>.vsix -p <token>`, see
+   CONTRIBUTING.md) or the `.vsix` to upload.
    Attach the `.vsix` to a GitHub release with `gh release create` if asked.
