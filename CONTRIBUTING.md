@@ -40,8 +40,32 @@ machine.
 3. Install it (`code --install-extension kiro-chat-<version>.vsix --force`)
    and run the manual checks.
 4. Commit, tag `v<version>`, push.
-5. Publish: `npx vsce publish` (needs a Marketplace token for the
-   `SepiaGroup` publisher), or upload the `.vsix` in the Marketplace portal.
+5. Publish the same `.vsix` to both registries, so they ship identical files:
+   - VS Code Marketplace (VS Code): `npx vsce publish --packagePath
+     kiro-chat-<version>.vsix`. Needs a Marketplace token for the `SepiaGroup`
+     publisher (`npx vsce login SepiaGroup`). Or upload the `.vsix` in the
+     Marketplace portal.
+   - Open VSX (Kiro IDE, VSCodium, Cursor and other VS Code builds):
+     `npx ovsx publish kiro-chat-<version>.vsix -p <token>`. Needs an Open VSX
+     token from an account that owns the `SepiaGroup` namespace.
+
+   Publish from the tagged commit, after `git status` shows nothing changed:
+   both registries show the README and CHANGELOG from the `.vsix`.
+
+### One-time setup
+
+- **VS Code Marketplace:** create the `SepiaGroup` publisher at
+  <https://marketplace.visualstudio.com/manage>, then a Personal Access Token in
+  Azure DevOps (organization "All accessible organizations", scope Marketplace →
+  Manage).
+- **Open VSX:** log in at <https://open-vsx.org> with GitHub, sign the Eclipse
+  Foundation publisher agreement (profile page; it needs an Eclipse account
+  linked to the same GitHub account), create an access token in Settings →
+  Access Tokens, then create the namespace once:
+  `npx ovsx create-namespace SepiaGroup -p <token>`.
+
+Keep both tokens out of the repo and out of shell history (for example
+`read -s OVSX_PAT` and `-p "$OVSX_PAT"`).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the code is laid out
 and [AGENTS.md](AGENTS.md) for the design rules and conventions (written for
