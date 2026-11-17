@@ -38,6 +38,7 @@ Then run **Developer: Reload Window**.
 ### Opening chats
 - [ ] `Cmd+Alt+K` and the **Kiro Chat** status-bar item open a chat tab. `Cmd+Shift+K` still deletes the line in an editor.
 - [ ] With `openIn` = `panel`, they open the side bar chat instead.
+- [ ] The Kiro Chat ghost button shows at the top right of an editor (also with the chat tab itself active), is visible in light and dark themes, and has the tooltip "Kiro Chat: Open Chat". Clicking it opens or shows the chat as `Cmd+Alt+K` does.
 - [ ] The Kiro Chat icon in the Activity Bar (left edge) is a ghost that follows the theme colour (light and dark themes, selected and not selected). One click opens the side bar with the chat, whatever `openIn` is. The chat fits the narrow width (toolbar, Resume, Settings, approval cards). Dragging the view to the bottom panel keeps it working, and it stays there after a reload.
 - [ ] Pressing `Cmd+Alt+K` again brings the same tab forward; it doesn't open another.
 - [ ] ＋ (right of Restart) and **New Chat Tab** open "Kiro Chat 2", "Kiro Chat 3", …

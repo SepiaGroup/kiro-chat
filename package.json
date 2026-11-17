@@ -51,7 +51,10 @@
       {
         "command": "kiroChat.open",
         "title": "Kiro Chat: Open Chat",
-        "icon": "$(comment-discussion)"
+        "icon": {
+          "light": "media/button-light.svg",
+          "dark": "media/button-dark.svg"
+        }
       },
       {
         "command": "kiroChat.newSession",
@@ -255,6 +258,12 @@
       }
     },
     "menus": {
+      "editor/title": [
+        {
+          "command": "kiroChat.open",
+          "group": "navigation@100"
+        }
+      ],
       "editor/title/context": [
         {
           "command": "kiroChat.renameChat",

@@ -35,7 +35,8 @@ slash commands use v3-only ACP methods.
 
 `Cmd+Alt+K` (`Ctrl+Alt+K` elsewhere), the **Kiro Chat** status-bar item, or **Kiro Chat:
 Open Chat** opens the chat as an editor tab (set `kiroChat.openIn` to
-`panel` to use the side bar instead). The **Kiro Chat** icon in the Activity Bar
+`panel` to use the side bar instead). The **Kiro Chat** ghost button at the top right of the editor does the same as
+Open Chat. The **Kiro Chat** icon in the Activity Bar
 (the left edge) always opens the side bar chat. Drag its icon or its view
 elsewhere (for example into the bottom panel) if you prefer.
 
