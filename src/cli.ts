@@ -26,7 +26,7 @@ export function resolveCliPath(configured?: string): string | undefined {
     const p = configured.trim();
     const problem = executableProblem(p);
     if (problem) {
-      throw new Error(`kiroCliChat.kiroCliPath is set to "${p}", which ${problem}. Fix or clear the setting.`);
+      throw new Error(`kiroChat.kiroCliPath is set to "${p}", which ${problem}. Fix or clear the setting.`);
     }
     return p;
   }

@@ -50,12 +50,12 @@ export type GateKind = "badLink" | "unpaired" | "noChats" | "pick" | "gone" | "r
 
 /** What the start-up screen says. Short sentences that say what to do next. */
 export const GATE_TEXT: Record<GateKind, string> = {
-  badLink: "This pairing link is not valid any more. In VS Code run \"Kiro CLI Chat: Show Remote Access Link\" and open the new link.",
-  unpaired: "This device is not paired. In VS Code run \"Kiro CLI Chat: Show Remote Access Link\" and open that link here.",
+  badLink: "This pairing link is not valid any more. In VS Code run \"Kiro Chat: Show Remote Access Link\" and open the new link.",
+  unpaired: "This device is not paired. In VS Code run \"Kiro Chat: Show Remote Access Link\" and open that link here.",
   noChats: "No chat is open in VS Code. Open one there, then reload this page.",
   pick: "Choose a chat",
   gone: "That chat was closed in VS Code. Choose another.",
-  removed: "This device was removed in VS Code. Run \"Kiro CLI Chat: Show Remote Access Link\" to pair it again.",
-  denied: "This device may not view chats. Change kiroCliChat.remote.permissions in VS Code.",
+  removed: "This device was removed in VS Code. Run \"Kiro Chat: Show Remote Access Link\" to pair it again.",
+  denied: "This device may not view chats. Change kiroChat.remote.permissions in VS Code.",
   offline: "Cannot reach VS Code. Check that Tailscale is on and that remote access is running, then reload.",
 };

@@ -1,4 +1,4 @@
-// Shared types for the Kiro CLI Chat extension.
+// Shared types for the Kiro Chat extension.
 
 import type { ApprovalRule, RuleKind } from "./approvalRules";
 export type { ApprovalRule, RuleKind } from "./approvalRules";

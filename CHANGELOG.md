@@ -5,7 +5,7 @@
 First release.
 
 - `/remote` in the terminal chat starts or stops remote access and shows the pairing card.
-- Security: a paired device is now trusted like you at the keyboard, in chat tabs and terminal chats (before: Allow once and Deny only). Anything that changes approvals or Autopilot needs the `approve` permission, also when typed as a command. Take `approve` out of `kiroCliChat.remote.permissions` to stop a device answering approvals; there is no "once only" level.
+- Security: a paired device is now trusted like you at the keyboard, in chat tabs and terminal chats (before: Allow once and Deny only). Anything that changes approvals or Autopilot needs the `approve` permission, also when typed as a command. Take `approve` out of `kiroChat.remote.permissions` to stop a device answering approvals; there is no "once only" level.
 - Remote devices can do what you can at the keyboard in a chat tab: all the approval choices (rules included), Autopilot and the other settings, Restart, Resume, new tabs and the `/` commands, with their output on the phone. What acts on the Mac itself (login, `/remote`, `/copy`, `/settings`, `/theme`, `/transcript`, `/chat save`, `/agent create|edit`, `/context add`, `/knowledge add|update`) is refused, and `/set` is limited to the Settings panel's options. In terminal chats on the phone, commands and settings stay as they were.
 - Slash commands work in chat tabs: `/usage`, `/context`, `/tools`, `/model`, `/compact`, `/help` and the rest of the terminal chat's commands run there, with their output in a card. Before, they went to the agent as text.
 - Fixed: the chat didn't follow a tool card as it grew, and a command's output box showed the start of the output instead of the end.
@@ -15,8 +15,9 @@ First release.
 - A chat's history in memory is limited to about 32 MB: images in the oldest messages go first.
 - Remote access with several windows: no two windows can hold the hub at once (lock files are written whole and a stale lock is removed safely), process ids reused after a restart no longer keep an old window listed, and calls between windows close when they time out.
 - Fixed: reply text written after a tool call was added to the reply above the tool cards, so the end of a long answer seemed missing.
-- Chat with the Kiro CLI v3 engine in editor tabs, the panel, or a text-mode
-  terminal chat, on Macs without AVX/AVX2.
+- Chat with the Kiro v3 engine in editor tabs, the panel, or a text-mode
+  terminal chat. Works on Macs without AVX/AVX2.
+- The extension is called Kiro Chat (was "Kiro CLI Chat"): its id is `sepiagroup.kiro-chat` and its settings and commands start with `kiroChat.` (was `kiroCliChat.`). Paired devices have to pair again.
 - Approvals like kiro-cli: Allow, Create allow rule… (exact, command pattern,
   folder, entire tool), Deny, Deny with reason…, Create deny rule….
 - The agent's questions (Spec mode) as a card or numbered choices, with your
@@ -38,7 +39,7 @@ First release.
   carries on.
 - Typing while the agent works sends your message to it (it reads it at its
   next step); in the terminal Esc takes back a message it hasn't read yet.
-- Optional (`kiroCliChat.shareEditorContext`, off by default): tell the agent
+- Optional (`kiroChat.shareEditorContext`, off by default): tell the agent
   which files are open and which is active.
 - Model, mode, effort and Autopilot switching; context breakdown and
   compaction; Resume; images; slash commands.

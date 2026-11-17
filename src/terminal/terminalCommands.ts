@@ -702,8 +702,8 @@ export class TerminalCommands {
   }
 
   async settings(): Promise<void> {
-    await vscode.commands.executeCommand("workbench.action.openSettings", "kiroCliChat");
-    this.host.print(style.gray("Opened the Kiro CLI Chat settings. Session settings are in /config."));
+    await vscode.commands.executeCommand("workbench.action.openSettings", "kiroChat");
+    this.host.print(style.gray("Opened the Kiro Chat settings. Session settings are in /config."));
   }
 
   async theme(): Promise<void> {

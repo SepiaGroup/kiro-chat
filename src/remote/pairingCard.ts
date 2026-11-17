@@ -67,7 +67,7 @@ ${qr}
   ${setup}
   ${retry}
 </div>
-<p class="note">The link works once, until ${esc(o.expiresAt)}. A device you pair stays paired until you remove it (Kiro CLI Chat: Remove Remote Device…).</p>
+<p class="note">The link works once, until ${esc(o.expiresAt)}. A device you pair stays paired until you remove it (Kiro Chat: Remove Remote Device…).</p>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
   document.addEventListener("click", (e) => {

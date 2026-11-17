@@ -209,7 +209,7 @@ export class TailscaleServe {
     if (existing === "other") {
       return {
         ok: false,
-        advice: `Port ${httpsPort} is already used by one of your Tailscale Serve settings. Pick another with kiroCliChat.remote.httpsPort (443, 8443 or 10000).`,
+        advice: `Port ${httpsPort} is already used by one of your Tailscale Serve settings. Pick another with kiroChat.remote.httpsPort (443, 8443 or 10000).`,
       };
     }
     // A proxy to another port that still answers belongs to someone else (another window, an
@@ -218,7 +218,7 @@ export class TailscaleServe {
     if (other !== undefined && other !== localPort && (await this.isAlive(other))) {
       return {
         ok: false,
-        advice: `Port ${httpsPort} is already shared for a program on local port ${other} (maybe another VS Code window). Pick another with kiroCliChat.remote.httpsPort (443, 8443 or 10000).`,
+        advice: `Port ${httpsPort} is already shared for a program on local port ${other} (maybe another VS Code window). Pick another with kiroChat.remote.httpsPort (443, 8443 or 10000).`,
       };
     }
     const r = await this.run(cli, serveArgs(localPort, httpsPort), 8000);

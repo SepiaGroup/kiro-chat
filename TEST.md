@@ -1,6 +1,6 @@
 # Test Plan
 
-Automated and manual checks for Kiro CLI Chat. Run the automated checks on
+Automated and manual checks for Kiro Chat. Run the automated checks on
 every change. Run the manual checks before a release, on the target machine
 (no AVX), with `kiro-cli` installed and logged in.
 
@@ -26,8 +26,8 @@ push and pull request.
 ## Install
 
 ```sh
-npm run package   # builds and writes kiro-cli-chat-<version>.vsix
-code --install-extension kiro-cli-chat-0.1.0.vsix --force
+npm run package   # builds and writes kiro-chat-<version>.vsix
+code --install-extension kiro-chat-0.1.0.vsix --force
 ```
 
 Then run **Developer: Reload Window**.
@@ -84,7 +84,7 @@ Then run **Developer: Reload Window**.
 ### Renaming a chat
 - [ ] In a chat tab, type `/` and pick **title**. `/title Build` renames the tab to "Build" and says "Title set to Build."; nothing goes to the agent. `/title` shows the name.
 - [ ] Reload the window: the tab is still "Build". `/title clear` gives it its own name back ("Kiro Chat 2"), also after the reload. A new tab gets the next number.
-- [ ] **Kiro CLI Chat: Rename Chat…** with the tab active: the box shows the name selected. A new name renames it; Esc keeps it; an empty name resets it.
+- [ ] **Kiro Chat: Rename Chat…** with the tab active: the box shows the name selected. A new name renames it; Esc keeps it; an empty name resets it.
 - [ ] On the phone, typing `/` doesn't offer `/title`. A chat renamed before its engine started (right after a reload) shows the new name in Resume.
 - [ ] Right-click a chat tab that is not the current one: **Rename Chat…** renames that tab, not the current one, also with tabs in two editor groups. On another webview tab (Markdown preview) it says it renames Kiro chat tabs and does nothing.
 - [ ] The same in the bottom-panel chat: the view's title changes, and comes back after a reload.
@@ -132,12 +132,12 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 
 ### Remote access (localhost)
 - [ ] Open ⚙ Settings in a chat: the panel has a clear border and shadow, and the Resume panel too. At the bottom, **Remote access** is unchecked. Tick it: remote access starts and the pairing link notice appears; the checkbox stays ticked and **Show pairing link** shows. Untick it: remote access stops. Starting it from the status bar menu or the command ticks the box in every open chat. The browser page's Settings has no Remote access row.
-- [ ] Run **Kiro CLI Chat: Start Remote Access**. The status bar shows **Remote**. Choose **Open in Browser**: the page opens in your browser, the address bar loses the `#k=...` part, and the chat shows the same conversation as the VS Code tab. With two chats open, a picker lists both (and remembers the last one next time).
+- [ ] Run **Kiro Chat: Start Remote Access**. The status bar shows **Remote**. Choose **Open in Browser**: the page opens in your browser, the address bar loses the `#k=...` part, and the chat shows the same conversation as the VS Code tab. With two chats open, a picker lists both (and remembers the last one next time).
 - [ ] Send a prompt from the browser: it appears in the VS Code chat too, and the reply streams in both. Stop works from the browser.
 - [ ] Autopilot off, ask for a command that needs approval: the card shows in both screens. Allow it in the browser: the card disappears in VS Code with a line "Allowed from <your browser>". Do it the other way round too ("Allowed on the desktop" in the browser). Deny with a reason works.
 - [ ] In a chat tab shown in the browser the approval card offers the same buttons as in VS Code. **Create allow rule…** works there (the next matching command is not asked again); the card goes away in VS Code, labelled "Allowed from <your browser>". In a terminal chat shown in the browser the card has Allow, Deny and Deny with reason only.
 - [ ] Browser, chat tab: `/usage`, `/context` and `/tools` show their card in the browser and in the VS Code tab (the command line says "(from <your browser>)"). `/compact` after a few messages works. `/model` lists the models. The `/` menu on the phone lists the commands, without `/copy`, `/login`, `/remote`, `/settings`, `/theme` and `/transcript`; typing one of those, or `/chat save x`, `/context add ~`, `/agent create x`, says it isn't available from a remote device.
-- [ ] Browser: with `approve` taken out of `kiroCliChat.remote.permissions`, `/autopilot on`, `/tools trust-all` and `/set autopilot on` are refused ("needs the approve permission") and the approval card has no usable buttons; put it back and they work. A question that nobody answers for 5 minutes counts as No.
+- [ ] Browser: with `approve` taken out of `kiroChat.remote.permissions`, `/autopilot on`, `/tools trust-all` and `/set autopilot on` are refused ("needs the approve permission") and the approval card has no usable buttons; put it back and they work. A question that nobody answers for 5 minutes counts as No.
 - [ ] Browser: `/autopilot on` turns Autopilot on (the ⚙ checkbox in VS Code follows); the Autopilot switch in the browser's ⚙ does the same. `/clear` empties the chat on both. `/knowledge clear` shows Yes/No on both; answering on one removes the card on the other.
 - [ ] Browser: **Restart** asks on the phone (Yes/No card), with no dialog on the Mac; Yes restarts. **Resume** lists sessions and loads one. ＋ opens a new chat tab in VS Code.
 - [ ] Browser, terminal chat: the `/` menu offers only the agent's commands, there is no Restart, Resume or ＋ (the approval card has the rule buttons), and `/usage` goes to the agent as text.
@@ -148,7 +148,7 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] Stop and start remote access (or reload the window with auto start on) while a browser page is open: the page shows "Reconnecting…", then shows the chat again by itself, with no new link. The address is the same as before (same port) unless that port was taken.
 - [ ] Close a chat tab in VS Code: a browser showing it is told it was closed and offers the other chats.
 - [ ] Untrusted workspace: Start Remote Access refuses with a message.
-- [ ] Restart VS Code: remote access is off unless `kiroCliChat.remote.autoStart` is on; paired devices are still paired.
+- [ ] Restart VS Code: remote access is off unless `kiroChat.remote.autoStart` is on; paired devices are still paired.
 
 ### Remote access (terminal chat)
 - [ ] Open a terminal chat with remote access on: the browser's chat list shows "Kiro Chat (terminal)" without a reload, with what the terminal has shown so far. `/title Build` renames it there, and so does **Rename** on the terminal's tab (within a few seconds). Closing the terminal removes it from the list.
@@ -177,7 +177,7 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] `what is in @file:README.md?` → the agent knows the contents; the chat and a Resumed session show `@file:README.md`, not the file's text. `@file:missing.txt` stays as typed. A line in the chat says "Attached: …" and "Not attached: … (reason)". A file over 256 KB or a binary file isn't attached.
 
 ### Editor context
-- [ ] With `kiroCliChat.shareEditorContext` off (default), asking "which file is open?" gets no VS Code files.
+- [ ] With `kiroChat.shareEditorContext` off (default), asking "which file is open?" gets no VS Code files.
 - [ ] Turn it on, open two files, click into the chat tab and ask "which file is active and which are open?". A line "Sent editor context: active …, 2 open files." appears and the answer names them. Ask again unchanged: no new line. Switch file and ask: a new line.
 - [ ] The same in a terminal chat. Files outside the chat's folder are never listed.
 
@@ -206,10 +206,10 @@ Needs two VS Code windows on different folders, each with a chat tab, and a pair
 - [ ] Logged out (`kiro-cli logout`), the chat offers a login button.
 
 ### Untrusted workspaces
-- [ ] Open a folder whose `.vscode/settings.json` sets `kiroCliChat.kiroCliPath` and `kiroCliChat.autopilot: true`. VS Code reports `kiroCliPath` as a machine setting that a workspace can't set; the chat uses the user-level path.
+- [ ] Open a folder whose `.vscode/settings.json` sets `kiroChat.kiroCliPath` and `kiroChat.autopilot: true`. VS Code reports `kiroCliPath` as a machine setting that a workspace can't set; the chat uses the user-level path.
 - [ ] Choose "Don't Trust" (Restricted Mode): the chat still works, and approvals are still asked (the workspace `autopilot` is ignored).
 
 ### Engine failures
-- [ ] Set `kiroCliChat.kiroCliPath` to a file that doesn't exist → the chat says the setting points to a missing file.
+- [ ] Set `kiroChat.kiroCliPath` to a file that doesn't exist → the chat says the setting points to a missing file.
 - [ ] Start a long reply, then `pkill -f "kiro-cli-chat acp"` → the chat says the engine exited, leaves the busy state, and Restart works.
 - [ ] Esc during a reply → the terminal footer shows "■ Cancelled".

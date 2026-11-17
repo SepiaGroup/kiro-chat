@@ -1,6 +1,6 @@
-# Agent guide: Kiro CLI Chat
+# Agent guide: Kiro Chat
 
-VS Code extension (`sepiagroup.kiro-cli-chat`) that chats with the Kiro CLI
+VS Code extension (`sepiagroup.kiro-chat`) that chats with the Kiro CLI
 agent on Macs without AVX/AVX2. The kiro-cli terminal UI crashes there with
 SIGILL, so the extension runs the headless engine, `kiro-cli acp --agent-engine
 v3 --auth-method cli`, speaks ACP (JSON-RPC over stdio) to it and draws its own
@@ -35,7 +35,7 @@ steps are in [CONTRIBUTING.md](CONTRIBUTING.md), manual checks in
   the kiro-cli TUI. When unsure how kiro-cli behaves, check it (see the
   `verify-engine-behavior` skill); don't guess.
 - Prefer VS Code-native behavior (theme variables `--vscode-*`, commands,
-  settings, output channel `Kiro CLI Chat`).
+  settings, output channel `Kiro Chat`).
 - No runtime dependencies. Markdown rendering is self-contained. Tool calls
   render as terminal-style cards.
 - The webview CSP allows no inline styles or scripts: use classes in
@@ -66,7 +66,7 @@ steps are in [CONTRIBUTING.md](CONTRIBUTING.md), manual checks in
 - Before a PR, all must pass: `npm run compile`, `npm run lint` (no output),
   `npm test`, `npm run package`.
 - To try a build: `npm run package`, then
-  `code --install-extension kiro-cli-chat-<version>.vsix --force` and ask the
+  `code --install-extension kiro-chat-<version>.vsix --force` and ask the
   user to reload the window.
 - With a behavior change, update README (user docs), TEST.md (manual checks),
   `docs/ARCHITECTURE.md` (design, engine facts) and CHANGELOG.md.

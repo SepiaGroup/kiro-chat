@@ -110,7 +110,7 @@ export class ChatSession implements RemoteChat {
     remoteAccess: async (action) => {
       // Not run for a remote device (routeSlash tells it so); this is the Mac's own.
       const id = { start: "startRemoteAccess", link: "showRemoteLink", stop: "stopRemoteAccess" }[action];
-      const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroCliChat.${id}`);
+      const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroChat.${id}`);
       return action === "stop" || result === true;
     },
     clearScreen: () => undefined,
@@ -562,7 +562,7 @@ export class ChatSession implements RemoteChat {
         await this.transport.runner.prompt(text);
       }
     } catch (err) {
-      this.post({ type: "error", message: describeError(errorMessage(err), "Kiro CLI Chat: Log In") });
+      this.post({ type: "error", message: describeError(errorMessage(err), "Kiro Chat: Log In") });
     } finally {
       this.conv.promptFinished(this.cancelRequested);
     }
@@ -754,7 +754,7 @@ export class ChatSession implements RemoteChat {
         this.post({
           type: "fatal",
           message:
-            "Could not find the kiro-cli binary. Set kiroCliChat.kiroCliPath in settings.",
+            "Could not find the kiro-cli binary. Set kiroChat.kiroCliPath in settings.",
         });
         return;
       }
@@ -813,12 +813,12 @@ export class ChatSession implements RemoteChat {
           this.engineTitle = undefined; // a new engine: give its session the name (set before it started, or restored)
           this.sendTitle();
           // The engine reports autopilot "on" by default, but approvals are
-          // decided by kiroCliChat.autopilot; align the engine option (and so
+          // decided by kiroChat.autopilot; align the engine option (and so
           // the Settings checkbox) with it.
           await client
             .setConfigOption("autopilot", cfg.autopilot ? "on" : "off")
             .catch((e) => this.log(`[start] autopilot sync failed: ${errorMessage(e)}`));
-          // v3 rejects --model, so apply kiroCliChat.defaultModel as a session
+          // v3 rejects --model, so apply kiroChat.defaultModel as a session
           // option. A reopened session keeps the model it had.
           if (engine === "v3" && !resumed && cfg.model && cfg.model !== "auto") {
             await client
