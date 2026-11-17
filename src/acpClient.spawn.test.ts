@@ -61,5 +61,6 @@ test("a program is started with the engine's arguments, speaks CRLF lines, and i
     await new Promise((r) => setTimeout(r, 20));
   }
   assert.equal(pid > 0 && alive(pid), false, "the engine process was stopped");
-  rmSync(dir, { recursive: true, force: true });
+  // Windows keeps a folder busy for a moment after its process has gone.
+  rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 });

@@ -21,7 +21,7 @@ test("on Windows a backslash is a path separator and stays", () => {
 });
 
 test("with oneLine a quote closes on its own line, so an apostrophe in prose does not pair up", () => {
-  const text = "it's here\nand it's there 'a b.png'";
+  const text = "it's here\nand isn't there\n'a b.png'";
   const quoted = (re: RegExp): string[] => {
     const out: string[] = [];
     for (let m = re.exec(text); m; m = re.exec(text)) {
@@ -31,6 +31,6 @@ test("with oneLine a quote closes on its own line, so an apostrophe in prose doe
     }
     return out;
   };
-  assert.deepEqual(quoted(wordPattern("darwin", false)), ["s here\nand it", "a b.png"]);
+  assert.deepEqual(quoted(wordPattern("darwin", false)), ["s here\nand isn", "a b.png"]);
   assert.deepEqual(quoted(wordPattern("darwin", true)), ["a b.png"]);
 });
