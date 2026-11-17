@@ -448,6 +448,46 @@ Other CLI calls (`detect.ts`):
 - `.vscodeignore` keeps sources, tests and docs out of the `.vsix`.
 - `npm run package` uses the pinned `@vscode/vsce` devDependency.
 
+## Windows
+
+Windows 11 support is best effort. Kiro CLI 2.0 added a native Windows build
+(PowerShell installer, `kiro-cli.exe` in `%LOCALAPPDATA%\Kiro-Cli`, from reports and
+the Kiro docs; not checked on a machine by this project). What differs from macOS, each
+a pure function that takes the platform so it is tested everywhere:
+
+- Finding the program: `where.exe kiro-cli` (full path under `%SystemRoot%`,
+  prefers `.exe`), then `candidateCliPaths`. A `.cmd` or `.bat` is refused,
+  because spawning one without a shell fails.
+- `sanitizedEnv` finds the PATH variable whatever its case (`Path` on Windows;
+  a copy of `process.env` is a plain, case-sensitive object) and splits on
+  `path.delimiter`.
+- A terminal opened to run `kiro-cli login` or an agent command gets a line in
+  the quoting of the user's shell (`shellCommandLine`): PowerShell needs `&` before
+  a quoted program, cmd wants double quotes, Git Bash single quotes.
+- `normalizePath` in `sessionList.ts` makes `C:\a\B`, `c:/a/b` and `C:/a/b/` the
+  same folder, so Resume finds sessions. Approval rules already handled drive
+  letters and backslashes (`approvalRules.ts`).
+- Stopping an engine: `child.kill("SIGTERM")` ends the process at once on
+  Windows (there are no signals), which is what we want.
+- The Tailscale CLI is also looked for in `%ProgramFiles%\Tailscale`.
+- `/paste` reads the clipboard through `osascript`, so it stays macOS only.
+
+Not verified: that `kiro-cli acp --agent-engine v3 --auth-method cli` and the
+engine's methods behave on Windows as on macOS, how the engine writes folder
+paths in `session/list`, and the terminal chat's keys in Windows Terminal. CI
+runs the compile, lint and the tests on `windows-latest` (324 pass, 24 are
+skipped there). That proves nothing about the real engine. The skipped tests:
+the fake-engine tests in `acpClient.engine.test.ts` and `terminalChat.test.ts`
+(the fake is a `#!` script, which Windows can't start), and three that check
+POSIX facts (the execute bit, file mode bits, macOS's `/private`). In their
+place `acpClient.spawn.test.ts` runs on every platform: it starts node as the
+program, with the fake engine as a file named `acp` in the working folder, and
+checks the arguments, CRLF lines, the PATH and that `dispose()` ends the process.
+
+A backslash is a path separator on Windows, so `tokenize` and `findImagePaths`
+(`terminal/words.ts`) don't treat it as an escape there; a path with spaces
+goes in quotes.
+
 ## Known limits
 
 - No `/guide`, `/goal` or `/voice` (unsupported by the engine or the machine).

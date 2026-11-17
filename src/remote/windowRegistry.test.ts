@@ -12,7 +12,8 @@ function rig(alive: (pid: number) => boolean = () => true) {
 }
 const win = (id: string, pid = 1, port = 5000) => ({ id, name: `w-${id}`, port, pid });
 
-test("the token is made once and is the same for every window", () => {
+// File modes are POSIX; on Windows the file is private through its folder's ACL (user profile).
+test("the token is made once and is the same for every window", { skip: process.platform === "win32" }, () => {
   const r = rig();
   try {
     const a = r.registry.token();

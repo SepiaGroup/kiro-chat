@@ -23,9 +23,15 @@ npm run lint      # eslint, must report nothing
 npm test          # unit tests (node --test), incl. a fake engine for AcpClient
 ```
 
-CI runs these and `npm run package` on every push and pull request. Before a
-release, also run the manual checklist in [TEST.md](TEST.md) on a Mac without
-AVX.
+CI runs these and `npm run package` on every push and pull request, and runs
+the compile, lint and tests on Windows too. Before a release, also run the
+manual checklist in [TEST.md](TEST.md) on a Mac without AVX, and its Windows
+section on a Windows 11 machine.
+
+Keep code that depends on the platform in a pure function that takes the
+platform as a parameter (see `candidateCliPaths`, `shellCommandLine`,
+`normalizePath` in `sessionList.ts`), so the Windows case can be tested on any
+machine.
 
 ## Release
 

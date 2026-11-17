@@ -1,12 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { join } from "path";
+import { homedir } from "os";
+import { join, resolve } from "path";
 import { expandFileMentions, FileIo, MAX_MENTION_BYTES, mentionNotice } from "./fileMentions";
 
+/** Files by path. The paths are resolved first, as the code under test resolves what it reads ("/w" is "D:\\w" on Windows). */
 function io(files: Record<string, string | Buffer>): FileIo {
+  const byPath = new Map(Object.entries(files).map(([k, v]) => [resolve(k), v]));
   return {
-    fileSize: (p) => (p in files ? Buffer.from(files[p]).length : undefined),
-    read: (p) => Buffer.from(files[p]),
+    fileSize: (p) => (byPath.has(p) ? Buffer.from(byPath.get(p) as string | Buffer).length : undefined),
+    read: (p) => Buffer.from(byPath.get(p) as string | Buffer),
   };
 }
 
@@ -21,6 +24,12 @@ test("absolute paths work; text without mentions is untouched", () => {
   assert.equal(expandFileMentions("hi @file", "/w", io({})).text, "hi @file");
   const m = expandFileMentions("@file:/x/n.txt", "/w", io({ "/x/n.txt": "n" }));
   assert.equal(m.text, '<attached_file path="/x/n.txt"> n </attached_file>');
+});
+
+test("~/ and ~\\ both mean the home folder", () => {
+  const files = { [join(homedir(), "n.txt")]: "n" };
+  assert.deepEqual(expandFileMentions("@file:~/n.txt", "/w", io(files)).attached, ["~/n.txt"]);
+  assert.deepEqual(expandFileMentions("@file:~\\n.txt", "/w", io(files)).attached, ["~\\n.txt"]);
 });
 
 test("a mention that can't be attached stays as typed, with a reason", () => {

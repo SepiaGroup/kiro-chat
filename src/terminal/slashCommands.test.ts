@@ -72,5 +72,5 @@ test("non-commands get no menu (dropped paths, multi-line)", () => {
 });
 
 test("tokenize honors quotes and escapes", () => {
-  assert.deepEqual(tokenize(`add "My Docs" ~/a\\ b.md 'x y'`), ["add", "My Docs", "~/a b.md", "x y"]);
+  assert.deepEqual(tokenize(`add "My Docs" ~/a\\ b.md 'x y'`, "darwin"), ["add", "My Docs", "~/a b.md", "x y"]);
 });

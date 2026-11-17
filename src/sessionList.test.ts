@@ -7,7 +7,16 @@ const s = (sessionId: string, source: string, cwd: string, updatedAt: string): S
   sessionId, source, cwd, updatedAt, title: sessionId, messageCount: 1,
 });
 
-test("normalizePath drops trailing slashes and /private", () => {
+test("on Windows the same folder compares equal however it is written", () => {
+  const a = normalizePath("C:\\Users\\Me\\App\\", "win32");
+  assert.equal(a, "c:/users/me/app");
+  assert.equal(normalizePath("c:/users/me/app", "win32"), a);
+  assert.equal(normalizePath("C:/Users/me/App/", "win32"), a);
+  assert.equal(normalizePath("C:\\", "win32"), "c:/");
+  assert.notEqual(normalizePath("C:\\Users\\me\\app2", "win32"), a);
+});
+
+test("normalizePath drops trailing slashes and /private", { skip: process.platform === "win32" }, () => {
   assert.equal(normalizePath("/private/tmp/x/"), "/tmp/x");
   assert.equal(normalizePath("/"), "/");
 });

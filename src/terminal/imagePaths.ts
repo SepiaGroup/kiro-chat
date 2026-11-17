@@ -5,6 +5,7 @@
 import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { unescapeWord, wordPattern } from "./words";
 
 export const IMAGE_MIME_BY_EXT: Record<string, string> = {
   png: "image/png",
@@ -46,13 +47,13 @@ export function imageMimeForPath(p: string): string | undefined {
  * spaces, ~/ paths, paths relative to `cwd`, and file:// URIs. Existence is
  * not checked here.
  */
-export function findImagePaths(text: string, cwd: string): string[] {
+export function findImagePaths(text: string, cwd: string, platform: NodeJS.Platform = process.platform): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  const re = /'([^'\n]+)'|"([^"\n]+)"|((?:\\.|[^\s'"])+)/g;
+  const re = wordPattern(platform, true);
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
-    let token = m[1] ?? m[2] ?? (m[3] ?? "").replace(/\\(.)/g, "$1");
+    let token = m[1] ?? m[2] ?? unescapeWord(m[3] ?? "", platform);
     // "look at a.png," → drop trailing punctuation that isn't part of the name.
     const stripped = token.replace(/[),.;:!?]+$/, "");
     if (!imageMimeForPath(token) && imageMimeForPath(stripped)) {
@@ -68,11 +69,11 @@ export function findImagePaths(text: string, cwd: string): string[] {
       } catch {
         continue;
       }
-    } else if (p === "~" || p.startsWith("~/")) {
+    } else if (p === "~" || /^~[\\/]/.test(p)) {
       p = path.join(os.homedir(), p.slice(1));
     } else if (!path.isAbsolute(p)) {
       // Only treat it as a relative path if it looks like one.
-      if (!p.includes("/") && !/^[\w.-]+\.\w+$/.test(p)) {
+      if (!/[\\/]/.test(p) && !/^[\w.-]+\.\w+$/.test(p)) {
         continue;
       }
       p = path.resolve(cwd, p);

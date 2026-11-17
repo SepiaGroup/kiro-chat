@@ -4,7 +4,7 @@ VS Code extension (`sepiagroup.kiro-chat`) that chats with the Kiro CLI
 agent on Macs without AVX/AVX2. The kiro-cli terminal UI crashes there with
 SIGILL, so the extension runs the headless engine, `kiro-cli acp --agent-engine
 v3 --auth-method cli`, speaks ACP (JSON-RPC over stdio) to it and draws its own
-UI. **v3 engine only, macOS only** (Windows is out of scope).
+UI. **v3 engine only.** macOS is the tested platform; Windows 11 is supported on a best-effort basis (the tests run on Windows in CI, nobody has used it there). Linux is out of scope.
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing behavior; it
 has the module map, lifecycles and verified engine facts. Build and release

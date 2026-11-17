@@ -9,6 +9,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { AcpClient } from "../acpClient";
 import { errorMessage } from "../format";
+import { shellCommandLine } from "../shellCommand";
 import { AvailableCommand, ConfigOption, PromptImage } from "../types";
 import { fitAnsi, sanitize, style, truncate } from "./ansi";
 import { tokenize } from "./slashCommands";
@@ -508,7 +509,7 @@ export class TerminalCommands {
 
   async paste(): Promise<void> {
     if (process.platform !== "darwin") {
-      this.host.print(style.gray("/paste reads images from the macOS clipboard. On this system, drag image files onto the terminal instead."));
+      this.host.print(style.gray("/paste reads images from the macOS clipboard. On this system, drag image files onto the terminal, type their paths, or paste into a chat tab."));
       return;
     }
     const file = path.join(os.tmpdir(), `kiro-chat-clipboard-${Date.now()}.png`);
@@ -732,11 +733,11 @@ export class TerminalCommands {
       env: { EDITOR: "code --wait", VISUAL: "code --wait" },
     });
     t.show();
-    t.sendText([cli, ...args].map(shellQuote).join(" "));
+    t.sendText(shellCommandLine(cli, args, vscode.env.shell));
   }
 
   private absPath(p: string): string {
-    const expanded = p.startsWith("~/") ? path.join(os.homedir(), p.slice(2)) : p;
+    const expanded = /^~[\\/]/.test(p) ? path.join(os.homedir(), p.slice(2)) : p;
     return path.isAbsolute(expanded) ? expanded : path.resolve(this.host.cwd(), expanded);
   }
 
@@ -761,10 +762,6 @@ function formatNumber(n: number): string {
 
 function oneLine(s: string): string {
   return sanitize(s).replace(/\s+/g, " ").trim();
-}
-
-function shellQuote(s: string): string {
-  return /^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 function delay(ms: number): Promise<void> {

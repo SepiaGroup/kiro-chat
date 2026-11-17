@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // side bar, and may be closed, so this guarantees a way to reopen it).
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusItem.text = "$(comment-discussion) Kiro Chat";
-  statusItem.tooltip = "Open Kiro Chat (⌘⇧K)";
+  statusItem.tooltip = `Open Kiro Chat (${process.platform === "darwin" ? "⌘⌥K" : "Ctrl+Alt+K"})`;
   statusItem.command = "kiroChat.open";
   statusItem.show();
   context.subscriptions.push(statusItem);

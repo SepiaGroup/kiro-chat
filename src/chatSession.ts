@@ -14,6 +14,7 @@ import {
 import * as path from "path";
 import { randomUUID } from "crypto";
 import { resolveCliPath } from "./cli";
+import { shellCommandLine } from "./shellCommand";
 import { imageMimeForPath, sniffImageMime } from "./terminal/imagePaths";
 import { resetPreparedEngine } from "./enginePrep";
 import { approvalAnswerFromMessage } from "./approvalRules";
@@ -108,7 +109,7 @@ export class ChatSession implements RemoteChat {
     restart: () => this.confirmRestart(), // a remote device's /restart is handled in runSlash
     login: () => this.runLogin(),
     remoteAccess: async (action) => {
-      // Not run for a remote device (routeSlash tells it so); this is the Mac's own.
+      // Not run for a remote device (routeSlash tells it so); this is the computer's own.
       const id = { start: "startRemoteAccess", link: "showRemoteLink", stop: "stopRemoteAccess" }[action];
       const result = await vscode.commands.executeCommand<boolean | undefined>(`kiroChat.${id}`);
       return action === "stop" || result === true;
@@ -248,8 +249,8 @@ export class ChatSession implements RemoteChat {
   /**
    * A slash command typed in this tab. It runs the terminal chat's code; what
    * it prints shows in a card under the command, on every screen of this chat
-   * (the Mac's tab and remote pages), not kept after a reload. A remote
-   * device's commands run too, except the few that act on the Mac's screen.
+   * (the computer's tab and remote pages), not kept after a reload. A remote
+   * device's commands run too, except the few that act on the computer's screen.
    */
   private async runSlash(route: Exclude<SlashRoute, { kind: "agent" }>, images: number, origin: MessageOrigin): Promise<void> {
     if (this.commandBusy) {
@@ -275,7 +276,7 @@ export class ChatSession implements RemoteChat {
       return;
     }
     if (route.name === "resume" || (route.name === "chat" && sub === "load")) {
-      // The panel opens on the Mac's own page; a remote page has its own Resume button.
+      // The panel opens on the computer's own page; a remote page has its own Resume button.
       if (origin.kind === "desktop") {
         this.openResumePanel();
       }
@@ -310,7 +311,7 @@ export class ChatSession implements RemoteChat {
   }
 
   /**
-   * Show something of a command on every screen of this chat (the Mac's tab
+   * Show something of a command on every screen of this chat (the computer's tab
    * and the remote pages, which share one stream, so one device can't be
    * singled out). Not recorded in the transcript: a reload doesn't show it.
    */
@@ -348,7 +349,7 @@ export class ChatSession implements RemoteChat {
       userTurns: () => this.conv.userTurns,
       turnStats: () => this.conv.turnStats,
       mcpServers: () => this.conv.mcpServers,
-      setInput: (text) => this.targets.postToDesktop({ type: "setInput", text }), // the Mac's box only
+      setInput: (text) => this.targets.postToDesktop({ type: "setInput", text }), // the computer's box only
       addPendingImage: () => undefined, // /paste is terminal only
       setTitle: (t) => this.rename(t),
       title: () => this.title,
@@ -496,7 +497,7 @@ export class ChatSession implements RemoteChat {
         await this.loadSessionById(String(msg.sessionId ?? ""));
         break;
       case "restart":
-        // The Mac asks in a VS Code dialog; a remote device is asked on its own page, not on the Mac.
+        // The computer asks in a VS Code dialog; a remote device is asked on its own page, not on the computer.
         await (origin.kind === "remote" ? this.restartAskedOnPage(true) : this.confirmRestart());
         break;
       case "newTab":
@@ -1030,7 +1031,7 @@ export class ChatSession implements RemoteChat {
 
   /**
    * Restart asked from a remote device: the question goes to the chat's pages,
-   * not to a dialog on the Mac. `fromButton`: not from a command, so no command
+   * not to a dialog on the computer. `fromButton`: not from a command, so no command
    * may be running or start while the question is open.
    */
   private async restartAskedOnPage(fromButton: boolean): Promise<void> {
@@ -1097,7 +1098,7 @@ export class ChatSession implements RemoteChat {
     }
     const terminal = vscode.window.createTerminal("Kiro CLI Login");
     terminal.show();
-    terminal.sendText(`"${cliPath}" login`);
+    terminal.sendText(shellCommandLine(cliPath, ["login"], vscode.env.shell));
     void vscode.window
       .showInformationMessage(
         "Complete login in the terminal, then click Retry.",

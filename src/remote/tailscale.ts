@@ -26,13 +26,22 @@ export interface RunResult {
 
 export type Run = (cli: string, args: string[], timeoutMs: number) => Promise<RunResult>;
 
-/** Where the CLI may be. A GUI-launched VS Code often has no /usr/local/bin on its PATH. */
-export const CLI_CANDIDATES: readonly string[] = [
-  "tailscale",
-  "/usr/local/bin/tailscale",
-  "/opt/homebrew/bin/tailscale",
-  "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-];
+/**
+ * Where the CLI may be. A GUI-launched VS Code often has no /usr/local/bin on its PATH.
+ * On Windows the installer puts `tailscale.exe` in Program Files (and on PATH).
+ */
+export function cliCandidates(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): string[] {
+  if (platform === "win32") {
+    return ["tailscale", `${env.ProgramFiles || "C:\\Program Files"}\\Tailscale\\tailscale.exe`];
+  }
+  return [
+    "tailscale",
+    "/usr/local/bin/tailscale",
+    "/opt/homebrew/bin/tailscale",
+    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+  ];
+}
+export const CLI_CANDIDATES: readonly string[] = cliCandidates();
 
 /** HTTPS ports `tailscale serve` accepts. 8443 leaves 443 to whatever the user serves already. */
 export const HTTPS_PORTS: readonly number[] = [443, 8443, 10000];
@@ -183,7 +192,9 @@ export class TailscaleServe {
     private readonly run: Run = nodeRun,
     private readonly log: (line: string) => void = () => undefined,
     /** Whether a local port still has a server (required: without it, a live share of another window could be taken). */
-    private readonly isAlive: (port: number) => Promise<boolean>
+    private readonly isAlive: (port: number) => Promise<boolean>,
+    /** Where to look for the CLI (tests). */
+    private readonly candidates: readonly string[] = CLI_CANDIDATES
   ) {}
 
   get active(): boolean {
@@ -191,12 +202,12 @@ export class TailscaleServe {
   }
 
   async expose(localPort: number, httpsPort: number = DEFAULT_HTTPS_PORT): Promise<ExposeResult> {
-    this.cli ??= await findCli(this.run);
+    this.cli ??= await findCli(this.run, this.candidates);
     if (!this.cli) {
       return {
         ok: false,
         advice:
-          "Tailscale is not installed on this Mac (no tailscale command found). Install it from tailscale.com/download, log in, then start remote access again.",
+          "Tailscale is not installed on this computer (no tailscale command found). Install it from tailscale.com/download, log in, then start remote access again.",
       };
     }
     const cli = this.cli;
